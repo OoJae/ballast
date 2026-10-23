@@ -146,3 +146,21 @@ Dated notes on confusion, docs/API mismatches, and breakage, each with a propose
 - **Docs:** liquidations.md calls a profile bankrupt when base balance **or** margin balance is ≤ 0. **Skill:** only MB ≤ 0.
 - **Recorded:** an isolated NIGHT long with a negative `isolated_margin` is still open, and its served LP matches the formula.
 - **Fix:** `riskLevel` follows the skill (`// VERIFY`). Ask Strike which one is right.
+## 2026-10-23: which minimum size applies to limit orders (VERIFY in packages/engine)
+
+- **Docs:** strike-trading's CloseReason table says `order_less_than_min_size` checks `order_market_min_size` for every order type, limits included. `/v2/markets` also serves `order_limit_min_size` (both are "1" on NIGHT and ADA today).
+- **Fix (done):** `engineMarket` enforces the larger of the two, so either reading is safe. Ask Strike which field the engine reads for limit orders.
+## 2026-10-23: the limit price bound's reference is not documented (VERIFY in packages/engine)
+
+- **Docs:** `order_price_out_of_price_cap` / `_floor` mean "limit price too far from mark (`order_limit_price_bound`)". There is no formula: whether it is |price − mark| / mark, symmetric, and applied to post-only sells is inferred.
+- **Fix (done):** `validateCreate` checks ±4.5% of mark, inside Strike's 5%. A static reject only wastes one requote (a replace-batch then applies nothing); it never loosens safety. Ask Strike for the formula.
+## 2026-10-23: Ballast stands down whenever NIGHT's ask side is fully empty
+
+- **Measured (M3 replay of the first 3.4 h of recordings):** 142 requotes found no non-Ballast ask at all. The arm rule (L1 ≤ best ask − 5 bps) and the aggregate cap (asks within 2% of mid, Ballast excluded) then both read zero, and the engine stands down. Another 121 stood down for a fragile long under P2-blind mode.
+- This is fail-closed and matches plan section 5, but it is exactly when Ballast's asks would help most.
+- **Proposed fix (operator decision, not changed in M3):** with an empty ask side, arm against index + a fixed offset and size the cap from the last non-empty depth snapshot; or accept the stand-down.
+## 2026-10-23: replay assumes a recorded bid that crosses a Ballast ask would have traded
+
+- **Unknown:** whether the house posts its bids post-only. That is not public, and Ballast does not parse house order flags.
+- **Sim choice:** a recorded bid that opens at or above a resting Ballast ask takes it for the crossing size (25 of the 27 fills in the recorded replay). This is the conservative reading: more fills, more stress on cover and the floor.
+- **Fix:** revisit if Strike says how the house quotes. The same-size taker re-match is unaffected.
