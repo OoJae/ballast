@@ -7,6 +7,11 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@ballast/core": "workspace:*"
+    "@ballast/core": "workspace:*",
+    "@emurgo/cardano-serialization-lib-nodejs": "^17.0.0",
+    "better-sqlite3": "^13.0.3"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0"
   }
 }

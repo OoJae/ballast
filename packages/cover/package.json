@@ -1,0 +1,17 @@
+{
+  "name": "@ballast/cover",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Read-only Cardano cover oracle: pinned NIGHT per stake credential at a block height",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@ballast/core": "workspace:*",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@emurgo/cardano-serialization-lib-nodejs": "^17.0.0"
+  }
+}
