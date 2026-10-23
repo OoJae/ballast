@@ -609,13 +609,11 @@ export function createDaemon(deps: KeeperDeps): KeeperDaemon {
       ...(cfg.criticTimeoutMs !== undefined ? { timeoutMs: cfg.criticTimeoutMs } : {}),
     });
     rememberReport(report);
-    const trips = db
-      .guardTrips(w.validFromMs)
-      .map((t) => ({
-        ruleId: t.ruleId,
-        tsMs: t.tsMs,
-        ...(t.accountId ? { accountId: t.accountId } : {}),
-      }));
+    const trips = db.guardTrips(w.validFromMs).map((t) => ({
+      ruleId: t.ruleId,
+      tsMs: t.tsMs,
+      ...(t.accountId ? { accountId: t.accountId } : {}),
+    }));
     const outcome = registry.renew(report, trips, clock.now(), deps.daemonKey);
     if (outcome.ok) {
       db.insertRenewal(outcome.signed);
