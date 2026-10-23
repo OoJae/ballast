@@ -61,3 +61,12 @@ _(started 2026-10-23; the segment manifest and hourly roots live in `data/record
 - **Funding replica:** every recorded `fundingRate` (1,353 per market) is reproduced exactly from `averagePremiumIndex` and the served parameters, and every `averagePremiumIndex` (1,232 per market) exactly from its samples. Exactness holds at those two levels. Samples rebuilt from the L3 book fall within the stream index's 8-dp rounding for 1,338/1,350 (NIGHT) and 1,337/1,348 (ADA). Of the rest, 20 of 23 match the book as of the cycle's own time, and 3 ADA samples are unexplained.
 - **Mark replica (held-out half):** published `markPriceUpdate` marks reproduced with p50 0.021 / 0.007 bps and p99 0.77 / 0.65 bps (NIGHT / ADA). The best structure is P2 = 60 impact-mid basis samples ~1.5 s apart, with a 1.1 s book lag. P2's mid is the impact mid (top-of-book mid: 10.3 bps p50 error on NIGHT's P2 ticks).
 - **Floor inputs:** b_liq = 10 bps + 2 × max(held-out, all-tick) p99 = 11.5 / 11.3 bps. A NIGHT long was fragile (tier-consistent trigger within b_liq of the index) on 1.8% of ticks, an ADA long on none. Positions were never stale.
+
+## M4: cover oracle, live and read-only
+
+**2026-10-23, `pnpm ballast cover <addr>`** (Koios, pinned NIGHT `0691b2fe…5af1fa.4e49474854`, r = 0.5).
+- **Holder #0:** stake credential `stake1u8gesvq0fy6r6xcpt569yznrjcfdyux7j7ptd46f9qclz5gp23ddv` (derived locally, cross-checked with cardano-serialization-lib). At block 14,104,006: 0.000000 NIGHT in 0 UTxOs, capacity 0, as expected for a fresh wallet.
+- **A real NIGHT holder** (found via Koios `asset_addresses`; address withheld): at block 14,104,012 the stake credential holds 130,733.476954 NIGHT in 11 spendable UTxOs across 2 base addresses on the same stake key.
+  - Its first payment address alone sums to 120,189.314965 NIGHT, exactly Koios's own `asset_addresses` figure for it.
+  - One script-locked UTxO (3,514.720663 NIGHT) under the same stake key is excluded as cover.
+  - The proof passed the offline re-check and a live re-read of every UTxO ref via `utxo_info`.
