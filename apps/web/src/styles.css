@@ -1422,3 +1422,28 @@ input[type="range"] {
     display: none;
   }
 }
+
+/* A signed policy, framed like a Load Line Certificate: double hairline. */
+.certificate {
+  border: 1px solid var(--ink);
+  outline: 1px solid var(--line-strong);
+  outline-offset: 4px;
+  padding: 24px;
+  display: grid;
+  gap: 20px;
+  margin: 6px;
+}
+.cert-head {
+  display: grid;
+  gap: 8px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 16px;
+}
+.cert-kv {
+  grid-template-columns: minmax(90px, 140px) minmax(0, 1fr);
+}
+.join-closed {
+  margin: 0 0 24px;
+  display: grid;
+  gap: 10px;
+}

@@ -46,7 +46,7 @@ function resolveWorkspace(spec: string): string | undefined {
 /** NodeNext `./x.js` → x.ts; the web's bundler-style `./x` → x.ts or x.tsx; assets are skipped. */
 function resolveRelative(from: string, spec: string): string | undefined {
   const base = resolve(dirname(from), spec);
-  if (/\.(css|svg|json)$/.test(spec)) return undefined;
+  if (/\.(css|svg|json)$/.test(spec) || /\?(raw|url)$/.test(spec)) return undefined;
   for (const c of [
     base.replace(/\.js$/, ".ts"),
     base.replace(/\.js$/, ".tsx"),

@@ -15,19 +15,19 @@ Every check below is a mainnet or testnet write path that the plan (section 11) 
 unverified. Run them in this order; each one either passes or adopts its fallback before the
 next starts. D4, D5 and D9 are covered in their own sections.
 
-| #   | Check                                                     | Runs on                    | Why here                                                                                        |
-| --- | --------------------------------------------------------- | -------------------------- | ----------------------------------------------------------------------------------------------- |
-| 1   | D0: builder code `ballast` shows Active in the Strike app | Strike app                 | Its approval latency is unknown, so it goes first (done 2026-10-23; confirm it is still Active) |
-| 2   | D1: testnet write semantics                               | testnet                    | No money. Proves the replace-batch and silent-drop rules the keeper is built on                 |
-| 3   | D10: cover oracle                                         | Cardano mainnet, read-only | No money. Proves the cover input before any account quotes against it                           |
-| 4   | D4: Builder Connect                                       | mainnet                    | Creates holder #0's account and API key, which every later check needs                          |
-| 5   | D5: in-app deposit                                        | mainnet                    | Funds holder #0's margin                                                                        |
-| 6   | D2: builder attribution                                   | mainnet                    | The first resting ask; proves the `X-Builder-Fee-Bps` header survives                           |
-| 7   | D8: sockets and rate                                      | mainnet                    | Calibrates socket and order budgets before the 100-trial drill                                  |
-| 8   | D7: kill latency                                          | mainnet                    | 100 cancel-alls; publishes the kill p50/p99 the watchdog relies on                              |
-| 9   | D3: builder fee on a maker fill                           | mainnet + human probe      | Needs the probe master (another family) ready                                                   |
-| 10  | D6: mark probe                                            | mainnet + human probe      | Needs ≥ 24 h of recordings (the recorder has run since 2026-10-23 00:49 UTC)                    |
-| 11  | D9: exit and withdrawal                                   | mainnet                    | Last: it closes the short and takes the money out                                               |
+| #   | Check                                                                      | Runs on                    | Why here                                                                                        |
+| --- | -------------------------------------------------------------------------- | -------------------------- | ----------------------------------------------------------------------------------------------- |
+| 1   | D0: builder code `Ballast` (case-sensitive) shows Active in the Strike app | Strike app                 | Its approval latency is unknown, so it goes first (done 2026-10-23; confirm it is still Active) |
+| 2   | D1: testnet write semantics                                                | testnet                    | No money. Proves the replace-batch and silent-drop rules the keeper is built on                 |
+| 3   | D10: cover oracle                                                          | Cardano mainnet, read-only | No money. Proves the cover input before any account quotes against it                           |
+| 4   | D4: Builder Connect                                                        | mainnet                    | Creates holder #0's account and API key, which every later check needs                          |
+| 5   | D5: in-app deposit                                                         | mainnet                    | Funds holder #0's margin                                                                        |
+| 6   | D2: builder attribution                                                    | mainnet                    | The first resting ask; proves the `X-Builder-Fee-Bps` header survives                           |
+| 7   | D8: sockets and rate                                                       | mainnet                    | Calibrates socket and order budgets before the 100-trial drill                                  |
+| 8   | D7: kill latency                                                           | mainnet                    | 100 cancel-alls; publishes the kill p50/p99 the watchdog relies on                              |
+| 9   | D3: builder fee on a maker fill                                            | mainnet + human probe      | Needs the probe master (another family) ready                                                   |
+| 10  | D6: mark probe                                                             | mainnet + human probe      | Needs ≥ 24 h of recordings (the recorder has run since 2026-10-23 00:49 UTC)                    |
+| 11  | D9: exit and withdrawal                                                    | mainnet                    | Last: it closes the short and takes the money out                                               |
 
 **Rules for every live run (CLAUDE.md, working habits)**
 - **Go-ahead first.** Run the script with no flags. That is a dry run: it prints the exact plan
@@ -178,7 +178,7 @@ generated (only its public half left the machine); reconnecting revokes the old 
    zero-funding line). **Connect Lace**, approve the connection, sign the sign-in message.
    `/join` records your statement and shows Strike's account check (404 for a fresh account;
    a used account is refused as not dedicated).
-3. Step 4, **Connect to Strike**: read Strike's message on screen (builder `ballast`, fee cap 10
+3. Step 4, **Connect to Strike**: read Strike's message on screen (builder `Ballast` (case-sensitive), fee cap 10
    bps, your wallet, the API key, a nonce), then sign it in Lace. `/join` shows
    **404 → 200** and the account id. The script prints `after: 200`.
 4. **Reconnect:** reload `/join`, sign in again and run Connect to Strike once more. The script
@@ -234,7 +234,7 @@ BALLAST_ARM=1 pnpm exec tsx apps/cli/src/dayone/d2-builder-attribution.ts --live
   `X-Builder-Fee-Bps: 10`. It reads each back with the public
   `GET /v2/order?account_id&client_order_id` and with the signed read, then cancels both.
 - **Pass.** The public `GET /v2/order?account_id&client_order_id` shows
-  `Builder{Code:"ballast",FeeBps:10}`.
+  `Builder{Code:"Ballast",FeeBps:10}`.
 - **What it proves.** Attribution survives both quoting routes. Ballast never uses
   `/v2/order/replace`, which drops it.
 - **Fallback.** Test single vs batch routes, report to Strike, and run with fee 0 (attribution

@@ -161,6 +161,23 @@ function Problem({ error }: { error: unknown }) {
   );
 }
 
+/** True when this host has the holder role switched off (the public, read-only server). */
+function usePilotClosed(): boolean {
+  const [closed, setClosed] = useState(false);
+  useEffect(() => {
+    const ctl = new AbortController();
+    fetch(`${import.meta.env.VITE_API_BASE ?? ""}/api/holder/me`, { signal: ctl.signal })
+      .then(async (r) => {
+        if (r.status !== 404) return;
+        const body = (await r.json().catch(() => null)) as { error?: string } | null;
+        if (body?.error?.includes("disabled")) setClosed(true);
+      })
+      .catch(() => {});
+    return () => ctl.abort();
+  }, []);
+  return closed;
+}
+
 export function Join() {
   const { wallet, session } = useHolder();
   const { me, refresh } = useMe(session?.token ?? null);
@@ -183,6 +200,7 @@ export function Join() {
   }, [session, me]);
 
   const step = currentStep(p);
+  const closed = usePilotClosed();
   return (
     <>
       <header className="page-head">
@@ -194,6 +212,27 @@ export function Join() {
           account.
         </p>
       </header>
+      {closed ? (
+        <section className="notice join-closed" aria-labelledby="join-closed-title">
+          <h2 id="join-closed-title" className="card-title">
+            Joining isn't open on this server
+          </h2>
+          <p>
+            This public site is read-only and holds no keys. Connecting, depositing and signing run
+            on a separate host in a jurisdiction Strike serves, so the buttons below stop at
+            "Connect". You can still read every step.
+          </p>
+          <p>
+            Holder #0, the team's own account, completed this exact flow on Strike mainnet on 23 Oct
+            2026: one signature registered Ballast's key, an in-app deposit credited in about four
+            minutes, and its first covered ask filled.{" "}
+            <a href="https://github.com/OoJae/ballast/blob/main/docs/evidence/EVIDENCE.md">
+              See the evidence
+            </a>
+            .
+          </p>
+        </section>
+      ) : null}
 
       <div className="join">
         <ol className="join-progress" aria-label="Steps">
