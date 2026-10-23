@@ -4,14 +4,21 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./types": "./src/types.ts"
+    "./types": "./src/types.ts",
+    "./holder-types": "./src/holder-types.ts"
   },
   "dependencies": {
+    "@ballast/cardano": "workspace:*",
     "@ballast/core": "workspace:*",
+    "@ballast/cover": "workspace:*",
     "@ballast/evidence": "workspace:*",
+    "@ballast/governance": "workspace:*",
     "@ballast/market": "workspace:*",
     "@ballast/strike-client": "workspace:*",
     "pino": "^10.4.0",
     "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@ballast/fake-strike": "workspace:*"
   }
 }

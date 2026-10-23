@@ -8,6 +8,7 @@ import {
   parseHolderProofMessage,
   rawBodyHex,
   samePaymentKey,
+  summarizeTx,
   verifiedSigners,
   verifyCip8,
 } from "@ballast/cardano";
@@ -319,12 +320,10 @@ export class HolderPresentClient {
   private readonly usedNonces = new Map<string, number>();
   private readonly quotes = new Map<string, RememberedQuote>();
   readonly holderAddress: string;
-  private readonly paymentKeyHash: string;
 
   constructor(private readonly opts: HolderPresentClientOptions) {
-    const h = holderAddress(opts.holderAddress);
-    this.holderAddress = h.address;
-    this.paymentKeyHash = h.paymentKeyHash;
+    // A base address with payment and stake keys, or the constructor throws.
+    this.holderAddress = holderAddress(opts.holderAddress).address;
     this.doFetch = opts.fetch ?? fetch;
     this.now = opts.now ?? Date.now;
   }
@@ -389,15 +388,19 @@ export class HolderPresentClient {
       if (!signed) throw new StrikeRefusedError("route", "the quote's funding tx must be signed");
       let sameBody = false;
       let signers: string[] = [];
+      let witnesses = 0;
       try {
         sameBody = rawBodyHex(signed) === quote.txBodyHex;
         signers = verifiedSigners(signed);
+        witnesses = summarizeTx(signed).vkeyWitnesses;
       } catch {
         throw new StrikeRefusedError("route", "signed_tx_cbor is not a Cardano transaction");
       }
       if (!sameBody) throw new StrikeRefusedError("route", "signed_tx_cbor is not the quoted tx");
-      if (!signers.includes(this.paymentKeyHash)) {
-        throw new StrikeRefusedError("route", "signed_tx_cbor lacks the holder's signature");
+      // A multi-address wallet may sign with keys other than the connect address's; the chain
+      // enforces which keys the inputs need, so here every witness must verify and one must exist.
+      if (signers.length === 0 || signers.length !== witnesses) {
+        throw new StrikeRefusedError("route", "signed_tx_cbor needs valid wallet signatures only");
       }
     } else if (b.signed_tx_cbor !== undefined) {
       throw new StrikeRefusedError("route", "the quote had no funding tx to sign");

@@ -11,7 +11,17 @@ import type {
   ReplayIndexResponse,
 } from "./types.js";
 
+/**
+ * The holder role's routes, injected only when HOLDER_ROUTES=1. Typed structurally so this file
+ * imports nothing from the holder side: the public server never reaches the funding code.
+ */
+export interface HolderRoutes {
+  handle(req: IncomingMessage, res: ServerResponse, url: URL): Promise<void>;
+}
+
 export interface ApiDeps {
+  /** Undefined (the default) answers every /api/holder route with 404. */
+  holder?: HolderRoutes;
   symbols: readonly string[];
   cors: CorsPolicy;
   index: RecordingIndex;
@@ -41,7 +51,8 @@ class HttpError extends Error {
 /**
  * Ballast's public API: read-only, keyless, GET only. Every number it serves is derived from
  * sealed recordings (or, with BOOK_SOURCE=live, the public L3 feed); nothing here can write
- * to Strike or reveal an order id, account or address.
+ * to Strike or reveal an order id, account or address. The holder role (HOLDER_ROUTES=1) is a
+ * separate, injected handler under /api/holder; without it those paths are 404.
  */
 export function createApiServer(deps: ApiDeps): Server {
   let streams = 0;
@@ -266,6 +277,20 @@ export function createApiServer(deps: ApiDeps): Server {
 
   const handle = async (req: IncomingMessage, res: ServerResponse) => {
     const url = new URL(req.url ?? "/", "http://localhost");
+    if (url.pathname === "/api/holder" || url.pathname.startsWith("/api/holder/")) {
+      if (!deps.holder) {
+        sendError(req, res, 404, "holder routes are disabled on this server");
+        return;
+      }
+      try {
+        await deps.holder.handle(req, res, url);
+      } catch (err) {
+        deps.onError?.(err, url.pathname);
+        if (!res.headersSent) sendError(req, res, 500, "internal error");
+        else res.end();
+      }
+      return;
+    }
     if (req.method === "OPTIONS") {
       res.writeHead(204, {
         ...corsHeaders(req, deps.cors),
