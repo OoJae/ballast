@@ -197,6 +197,11 @@ export function createWatchdog(deps: WatchdogDeps): Watchdog {
       }),
   });
 
+  /** The watchdog's own order view: its stream is live, or a REST resync succeeded lately. */
+  function viewHealthy(w: Watched): boolean {
+    return w.ports.streamLive() || clock.now() - w.lastResyncAt <= 3 * (cfg.resyncEveryMs ?? 5_000);
+  }
+
   function live(w: Watched) {
     return w.rec.orders(symbol).filter((o) => o.side === "sell" && LIVE.has(o.status));
   }
@@ -273,8 +278,11 @@ export function createWatchdog(deps: WatchdogDeps): Watchdog {
           source: w.l3Ids.has(o.clientOrderId) ? "l3" : "view",
         });
       }
-      // Blind fallback: L3 asks carrying this account's fingerprint below the index guard.
-      if (mv.book && mv.l3Synced && spec && minIndexPx !== null) {
+      // Blind fallback, only while the watchdog's own order view is down (no live stream and no
+      // recent REST resync): L3 asks carrying this account's fingerprint below the index guard.
+      // A healthy view needs no guessing, and a foreign ask that happens to share a fingerprint
+      // must not trigger kills while the view can say whose it is.
+      if (!viewHealthy(w) && mv.book && mv.l3Synced && spec && minIndexPx !== null) {
         const mine = new Set(w.l3Ids.values());
         const codes = new Set([1, 2, 3].map((l) => fingerprintCode(w.ports.cfg.accountId, l)));
         for (const [price, queue] of mv.book.asks) {
@@ -301,7 +309,9 @@ export function createWatchdog(deps: WatchdogDeps): Watchdog {
       let capacitySteps: bigint | null = null;
       if (c && spec) {
         const whole = `${c.coverBase / 1_000_000n}.${(c.coverBase % 1_000_000n).toString().padStart(6, "0")}`;
-        capacitySteps = (spec.step.floorUnits(whole) * w.ports.cfg.rBps) / 10_000n;
+        // r is capped at 0.9 whatever the account file says (plan section 5).
+        const r = w.ports.cfg.rBps < 9_000n ? w.ports.cfg.rBps : 9_000n;
+        capacitySteps = (spec.step.floorUnits(whole) * r) / 10_000n;
       }
       return {
         accountId: w.ports.cfg.accountId,
@@ -330,6 +340,7 @@ export function createWatchdog(deps: WatchdogDeps): Watchdog {
       builderFeeBps: 0,
     };
     const l3At = [...w.l3Ids.values()];
+    // Only when blind do fingerprint matches stand in for the order view.
     const fp = facts().accounts.find((a) => a.accountId === accountId);
     for (const a of fp?.asks ?? [])
       if (a.source === "fingerprint") l3At.push(a.clientOrderId.slice(3));
@@ -362,7 +373,9 @@ export function createWatchdog(deps: WatchdogDeps): Watchdog {
       accountId,
       symbol,
     });
-    if (entry.decision !== "execute") {
+    // A dry run is only logged. A send that threw is still tracked, so it is retried and
+    // escalated like any unconfirmed kill.
+    if (entry.decision !== "execute" && entry.decision !== "error") {
       deps.killLog?.(entry);
       return;
     }
@@ -491,6 +504,7 @@ export function createWatchdog(deps: WatchdogDeps): Watchdog {
       const problems: string[] = [];
       const mv = deps.market.view();
       if (!mv.l3Synced) problems.push("watchdog L3 not synced");
+      if (!mv.spec) problems.push("watchdog has no market rules: price and cover rules are off");
       if (mv.indexAgeMs > 3_000) problems.push("watchdog index stale");
       if (!deps.monitor.alive()) problems.push("keeper heartbeat missing");
       if (cfg.dryRun && deps.monitor.latest()?.mode === "armed") {

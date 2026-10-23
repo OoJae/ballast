@@ -4,8 +4,9 @@
  *  - the account's user stream (or a REST resync) shows no live Ballast order on the symbol, and
  *  - every Ballast order that was attributed on L3 is gone from the L3 book;
  * Step 2: not confirmed within 5 s → a second cancel-all with a new nonce plus per-order
- * cancels from /v2/openOrders, and a page. Not confirmed within 10 s → escalated (page again);
- * the tracker keeps watching until it is confirmed.
+ * cancels from /v2/openOrders, and a page. Not confirmed within 10 s → escalated (page again),
+ * and the retry repeats every 5 s until the kill is confirmed: an unconfirmed kill never goes
+ * quiet, so callers that defer to it (instead of stacking cancel-alls) are never muted.
  *
  * Generic over where the confirmations come from, so the keeper and the watchdog (each with its
  * own stream and L3 view) share one implementation and one latency measure.
@@ -33,6 +34,7 @@ export interface Kill {
   streamConfirmedMs: number | null;
   l3ConfirmedMs: number | null;
   retries: number;
+  lastRetryAtMs: number | null;
 }
 
 export interface KillLatency {
@@ -65,7 +67,12 @@ export class KillTracker {
   }
 
   /** Track a cancel-all that was just sent. A newer kill for the same account replaces it. */
-  track(k: Omit<Kill, "key" | "status" | "streamConfirmedMs" | "l3ConfirmedMs" | "retries">): Kill {
+  track(
+    k: Omit<
+      Kill,
+      "key" | "status" | "streamConfirmedMs" | "l3ConfirmedMs" | "retries" | "lastRetryAtMs"
+    >,
+  ): Kill {
     const kill: Kill = {
       ...k,
       key: `${k.accountId}:${k.symbol}`,
@@ -73,6 +80,7 @@ export class KillTracker {
       streamConfirmedMs: null,
       l3ConfirmedMs: null,
       retries: 0,
+      lastRetryAtMs: null,
     };
     this.open.set(kill.key, kill);
     this.check();
@@ -113,13 +121,20 @@ export class KillTracker {
         continue;
       }
       const age = now - k.sentAtMs;
-      if (k.status === "sent" && age >= (this.opts.retryAfterMs ?? 5_000)) {
-        k.status = "retried";
+      const every = this.opts.retryAfterMs ?? 5_000;
+      const retry = () => {
         k.retries += 1;
+        k.lastRetryAtMs = now;
         this.opts.onRetry?.(k);
+      };
+      if (k.status === "sent" && age >= every) {
+        k.status = "retried";
+        retry();
       } else if (k.status === "retried" && age >= (this.opts.escalateAfterMs ?? 10_000)) {
         k.status = "escalated";
         this.opts.onEscalate?.(k);
+      } else if (k.status === "escalated" && now - (k.lastRetryAtMs ?? k.sentAtMs) >= every) {
+        retry();
       }
     }
   }

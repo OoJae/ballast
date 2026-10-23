@@ -104,6 +104,9 @@ export class AccountRuntime {
   housekeeping = false;
   /** Reduce-only buy-back in flight (client id), so at most one is outstanding. */
   buyBackInFlight: string | null = null;
+  buyBackSentAtMs = 0;
+  /** Bumped by every resync request, so a resync in flight cannot clear a newer request. */
+  resyncGen = 0;
   /** Loss stop: today's integrated combined-MTM PnL (µUSD) and the last sample it rests on. */
   loss: {
     day: number;

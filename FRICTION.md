@@ -288,3 +288,11 @@ Dated notes on confusion, docs/API mismatches, and breakage, each with a propose
 
 - **Cost:** the full suite went from about 34 s to about 66 s wall time (97 s before the chaos and invariant files were split so they run in parallel). These files wait out real 2 s replace-batch spacing, 2 s silent-drop lookups and kill-retry windows; the 429-storm case alone takes about 20 s.
 - **Fix:** give FakeStrike, the daemon and the strike-client timers one injectable clock (vitest fake timers do not reach the `ws` sockets).
+
+## 2026-10-23: two review findings left open in the M6 keeper and watchdog
+
+- **Restart does not re-register in-flight creates:** a keeper that crashes between a 201 and the create's stream event restarts with an empty PendingCreates. It learns its orders from the first `/v2/openOrders` resync and the user stream. A create that was sequenced but not yet visible at that resync shows up later on the stream as an order the keeper did not send in this run. It is a `bal_` id, so it is adopted, not treated as manual activity. A create that was silently dropped is simply never seen.
+- **Risk:** until that order shows up, the keeper undercounts its resting size, so one create could overshoot the cover invariant by up to that order's size. The window is short: a systemd restart takes seconds, and Strike sequences a 201'd create well before then. The watchdog's cover rule uses its own stream and L3 view, so it would cancel on an overshoot.
+- **Fix:** on start, read the evidence DB's unresolved creates for each account and feed them to PendingCreates before the first tick, so silent-drop lookups resume.
+- **Watchdog kills are not signed decision records:** host B holds no daemon signing key (by design, CANCEL_ONLY), so its kills go to its own `kills` JSONL and SQLite table, with latency, and not into the keeper's hash chain. `ballast verify` therefore does not see them.
+- **Fix:** give the watchdog its own signing domain (`ballast/watchdog/v1`) and key, append its kills to a separate chain, and teach verify to merge both chains by time.

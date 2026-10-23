@@ -79,6 +79,8 @@ import {
   type CreateOrderBody,
   type CreateOutcome,
   cancelAll,
+  canonicalPrice,
+  compareDecimalStrings,
   decToString,
   type OrderTradeUpdate,
   type PendingCreate,
@@ -402,7 +404,9 @@ export function createDaemon(deps: KeeperDeps): KeeperDaemon {
         symbol: k.symbol,
       });
     },
-    onRetry: (k) => void retryKill(k),
+    onRetry: (k) => {
+      retryKill(k).catch((err) => logger.error({ err: errText(err) }, "kill retry failed"));
+    },
     onEscalate: (k) => {
       if (k.dbId !== null) {
         try {
@@ -793,7 +797,10 @@ export function createDaemon(deps: KeeperDeps): KeeperDaemon {
 
   function onUserResync(accountId: string): void {
     const rt = byId.get(accountId);
-    if (rt) rt.needsResync = true;
+    if (rt) {
+      rt.needsResync = true;
+      rt.resyncGen += 1;
+    }
     requestTick("user-resync");
   }
 
@@ -822,7 +829,8 @@ export function createDaemon(deps: KeeperDeps): KeeperDaemon {
       if (mb === null || mm === null) throw new Error("balances row without marginBalance");
       rt.margin = {
         equityMicroUsd: microUsd(maxBigint(0n, mb)),
-        ratioBps: mb > 0n ? (mm * 10_000n + mb - 1n) / mb : null,
+        // A non-positive margin balance is past every band: flatten, not "unknown".
+        ratioBps: mb > 0n ? (mm * 10_000n + mb - 1n) / mb : 10_000n,
         atMs: clock.now(),
       };
       rt.marginError = null;
@@ -849,8 +857,9 @@ export function createDaemon(deps: KeeperDeps): KeeperDaemon {
     rt.resyncing = true;
     try {
       // openOrders, a settle wait of the reconciler's lag, then positions (strike-userstream).
+      const gen = rt.resyncGen;
       await resyncAccount(rt.reconciler, rt.ports.reads, { symbol });
-      rt.needsResync = false;
+      if (rt.resyncGen === gen) rt.needsResync = false;
       state.dirty = true;
     } catch (err) {
       logger.warn({ account: rt.id, err: errText(err) }, "REST resync failed; retrying next tick");
@@ -1040,17 +1049,34 @@ export function createDaemon(deps: KeeperDeps): KeeperDaemon {
       .filter((o) => o.side === "sell" && isLive(rt, o.clientOrderId))
       .map((o) => o.clientOrderId);
     const l3At = liveIds.flatMap((id) => (rt.l3Ids.has(id) ? [rt.l3Ids.get(id) as string] : []));
+    // Orders not (yet) attributed on L3 are confirmed gone by price and exact size instead.
+    const unattributed = rt.reconciler
+      .orders(symbol)
+      .filter((o) => liveIds.includes(o.clientOrderId) && !rt.l3Ids.has(o.clientOrderId) && o.price)
+      .map((o) => ({ price: o.price as string, size: decToString(o.size) }));
     const cover = deps.cover.view(rt.id);
-    const record = append({
-      kind: "kill",
-      accountId: rt.id,
-      inputsDigest: hashOf({ reason, symbol, live: liveIds, cover: cover?.proof.hash ?? null }),
-      inputsRef: null,
-      ops: [{ route: "DELETE /v2/order/cancel-all" }],
-      guard: guardSummary(g),
-    });
+    let record: DecisionRecord | null = null;
+    try {
+      record = append({
+        kind: "kill",
+        accountId: rt.id,
+        inputsDigest: hashOf({ reason, symbol, live: liveIds, cover: cover?.proof.hash ?? null }),
+        inputsRef: null,
+        ops: [{ route: "DELETE /v2/order/cancel-all" }],
+        guard: guardSummary(g),
+      });
+    } catch (err) {
+      // The evidence write failed; the cancel still goes (it is exempt and it reduces risk).
+      logger.error(
+        { account: rt.id, err: errText(err) },
+        "kill record not written; cancelling anyway",
+      );
+    }
     const t = trigger ?? killTrigger(reason);
-    logger.warn({ account: rt.id, reason, decision: g.decision, seq: record.seq }, "cancel-all");
+    logger.warn(
+      { account: rt.id, reason, decision: g.decision, seq: record?.seq ?? null },
+      "cancel-all",
+    );
     if (g.decision !== "execute") {
       if (g.decision === "dry-run")
         logger.info({ account: rt.id, reason }, "DRY_RUN: would cancel-all");
@@ -1063,7 +1089,7 @@ export function createDaemon(deps: KeeperDeps): KeeperDaemon {
         symbol,
         trigger: t,
         sentAtMs: now,
-        decisionSeq: record.seq,
+        ...(record ? { decisionSeq: record.seq } : {}),
       });
     } catch (err) {
       logger.error({ err: errText(err) }, "kill row not recorded");
@@ -1085,7 +1111,13 @@ export function createDaemon(deps: KeeperDeps): KeeperDaemon {
           if (!mv.book || !mv.l3Synced) return false;
           const present = new Set<string>();
           for (const q of mv.book.asks.values()) for (const o of q) present.add(o.id);
-          return l3At.every((id) => !present.has(id));
+          if (!l3At.every((id) => !present.has(id))) return false;
+          return unattributed.every(
+            (u) =>
+              !(mv.book?.asks.get(canonicalPrice(u.price)) ?? []).some(
+                (o) => compareDecimalStrings(o.size, u.size) === 0,
+              ),
+          );
         },
       },
     });
@@ -1112,7 +1144,8 @@ export function createDaemon(deps: KeeperDeps): KeeperDaemon {
   async function retryKill(k: Kill): Promise<void> {
     const rt = byId.get(k.accountId);
     if (!rt) return;
-    if (k.dbId !== null) {
+    // Retries after escalation keep the row escalated: it is the worse of the two states.
+    if (k.dbId !== null && k.status !== "escalated") {
       try {
         db.setKillStatus(k.dbId, "retried");
       } catch {}
@@ -1121,7 +1154,10 @@ export function createDaemon(deps: KeeperDeps): KeeperDaemon {
       kind: "kill-escalated",
       source: "keeper",
       severity: "page",
-      title: "cancel-all unconfirmed after 5 s: second cancel-all and per-order cancels",
+      title:
+        k.retries <= 1
+          ? "cancel-all unconfirmed after 5 s: second cancel-all and per-order cancels"
+          : `cancel-all still unconfirmed: retry ${k.retries}`,
       detail: k.reason,
       accountId: k.accountId,
       symbol: k.symbol,
@@ -1134,10 +1170,22 @@ export function createDaemon(deps: KeeperDeps): KeeperDaemon {
       builderFeeBps: 0,
     };
     const g = checkRiskReducing({ request, profile: "AUTONOMOUS", flags: { dryRun: cfg.dryRun } });
-    append({
+    const record = (draft: DecisionDraft) => {
+      try {
+        append(draft);
+      } catch (err) {
+        logger.error({ err: errText(err) }, "kill retry record not written; cancelling anyway");
+      }
+    };
+    record({
       kind: "kill",
       accountId: rt.id,
-      inputsDigest: hashOf({ retryOf: k.dbId, reason: k.reason, sentAtMs: k.sentAtMs }),
+      inputsDigest: hashOf({
+        retryOf: k.dbId,
+        reason: k.reason,
+        sentAtMs: k.sentAtMs,
+        n: k.retries,
+      }),
       inputsRef: null,
       ops: [{ route: "DELETE /v2/order/cancel-all" }],
       guard: guardSummary(g),
@@ -1152,7 +1200,7 @@ export function createDaemon(deps: KeeperDeps): KeeperDaemon {
     try {
       const open = await rt.ports.reads.openOrders(k.symbol);
       if (open.orders.length > 0) {
-        append({
+        record({
           kind: "kill",
           accountId: rt.id,
           inputsDigest: hashOf({ retryOf: k.dbId, perOrder: open.orders.map((o) => String(o.ID)) }),
@@ -1190,7 +1238,20 @@ export function createDaemon(deps: KeeperDeps): KeeperDaemon {
     mv: MarketView,
     m: EngineMarket,
   ): Promise<void> {
-    if (rt.buyBackInFlight !== null || qty <= 0n) return;
+    if (rt.buyBackInFlight !== null) {
+      const o = rt.reconciler.order(rt.buyBackInFlight);
+      const stuck =
+        o === undefined ||
+        !isLive(rt, rt.buyBackInFlight) ||
+        clock.now() - rt.buyBackSentAtMs > 30_000;
+      if (!stuck) return;
+      logger.warn(
+        { account: rt.id, clientOrderId: rt.buyBackInFlight },
+        "clearing an ended or stuck buy-back",
+      );
+      rt.buyBackInFlight = null;
+    }
+    if (qty <= 0n) return;
     const mark = decRef(m, mv.price?.mark);
     const policyHash = registry.headHash();
     if (!mark || !policyHash) {
@@ -1238,6 +1299,7 @@ export function createDaemon(deps: KeeperDeps): KeeperDaemon {
       return;
     }
     rt.buyBackInFlight = id;
+    rt.buyBackSentAtMs = clock.now();
     rt.reconciler.registerCreate({ clientOrderId: id, symbol, side: "buy", size, price });
     rt.pending.register(rt.id, symbol, id);
     createdIds.set(id, policyHash);
@@ -1370,7 +1432,9 @@ export function createDaemon(deps: KeeperDeps): KeeperDaemon {
     for (const action of k.actions) {
       if (action.kind === "cancel-all") await sendCancelAll(rt, action.reason);
       // Cover unknown is not cover zero: no buy-back until a proof exists.
-      else if (cover) await sendBuyBack(rt, action.qty, action.reason, mv, m);
+      else if (cover || action.reason === "flatten band") {
+        await sendBuyBack(rt, action.qty, action.reason, mv, m);
+      }
     }
   }
 
@@ -1406,7 +1470,6 @@ export function createDaemon(deps: KeeperDeps): KeeperDaemon {
     mv: MarketView,
     m: EngineMarket,
     active: ActivePolicy | null,
-    house: LevelBook,
   ): Promise<void> {
     const now = clock.now();
     const price = mv.price;
@@ -1425,22 +1488,28 @@ export function createDaemon(deps: KeeperDeps): KeeperDaemon {
     let triggered = state.dirty || moved || heartbeat || lastStandDown;
     // The trigger is consumed now; fills, cover and silent-drop outcomes during the round re-arm it.
     if (triggered) state.dirty = false;
-    const markTicks = m.tick.ceilUnits(price.mark);
     let floorChanged = false;
     let deferred = false;
     for (const rt of accounts) {
       const books = accounts.map((a) => ({ id: a.id, book: accountBook(a, symbol, m) }));
+      // Facts as they are now: earlier accounts' sends were awaited, and the Guard must judge
+      // freshness, the book and the mark at the moment it decides, not at the tick's start.
+      const mvNow = deps.market.view(symbol);
+      const priceNow = mvNow.price;
+      if (!priceNow) break;
+      const houseNow = houseBook(mvNow, m, books);
+      const markTicks = m.tick.ceilUnits(priceNow.mark);
       const seq = BigInt(log.head().seq + 1);
       const plan: RequotePlan = engine.plan({
         market: m,
         caps: caps as MarketCaps,
         policy,
         policyHash,
-        book: house,
-        index: price.index,
-        mark: price.mark,
-        positions: mv.positions,
-        positionsAgeMs: mv.positionsAgeMs,
+        book: houseNow,
+        index: priceNow.index,
+        mark: priceNow.mark,
+        positions: mvNow.positions,
+        positionsAgeMs: mvNow.positionsAgeMs,
         replicaP99Bps: p99,
         // P2-blind until D6 validates the replica's P2 (plan section 5); the replica runs in
         // market state for drift monitoring only.
@@ -1478,10 +1547,10 @@ export function createDaemon(deps: KeeperDeps): KeeperDaemon {
           ap.diff.cancels,
           seq,
           {
-            mv,
+            mv: mvNow,
             m,
             active,
-            house,
+            house: houseNow,
             books,
             myBook,
             policy,
@@ -1748,11 +1817,13 @@ export function createDaemon(deps: KeeperDeps): KeeperDaemon {
     }
     attribute(mv);
     for (const rt of accounts) {
-      await enforce(rt, mv, m, accountBook(rt, symbol, m), stale, active);
+      try {
+        await enforce(rt, mv, m, accountBook(rt, symbol, m), stale, active);
+      } catch (err) {
+        logger.error({ account: rt.id, err: errText(err) }, "enforcement failed for this account");
+      }
     }
-    const books = accounts.map((a) => ({ id: a.id, book: accountBook(a, symbol, m) }));
-    const house = houseBook(mv, m, books);
-    if (!state.stopping) await requote(mv, m, active, house);
+    if (!state.stopping) await requote(mv, m, active);
     kills.check();
   }
 

@@ -57,11 +57,18 @@ export class CoverWatch implements CoverSource {
   /** Feed a proof directly (the poller uses this; tests use it to move cover). */
   accept(accountId: string, proof: CoverProof): void {
     const prev = this.states.get(accountId);
+    // A lagging provider must not restore pre-spend cover: never step back to a lower block.
+    if (prev && proof.height < prev.height) return;
     const changed =
       !prev || prev.height !== proof.height || prev.proof.coverBase !== proof.coverBase;
-    // A spend stays flagged until a block after the one it was seen at has been proven.
+    // A spend stays flagged until a later block's proof no longer counts any UTxO it spends.
+    const counted = new Set(proof.utxos.map((u) => u.ref));
     const spend =
-      prev?.mempoolSpend && proof.height <= prev.mempoolSpend.height ? prev.mempoolSpend : null;
+      prev?.mempoolSpend &&
+      (proof.height <= prev.mempoolSpend.height ||
+        prev.mempoolSpend.refs.some((r) => counted.has(r)))
+        ? prev.mempoolSpend
+        : null;
     this.states.set(accountId, {
       proof,
       coverBase: BigInt(proof.coverBase),
