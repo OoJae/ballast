@@ -338,3 +338,13 @@ Dated notes on confusion, docs/API mismatches, and breakage, each with a propose
 
 - **Symptom:** the first deploy built with Railpack and failed ("No start command detected"). `railway.json` was ignored, and `railway environment edit --service-config ballast-public build.builder DOCKERFILE` answered "No changes to apply" while the config still read RAILPACK.
 - **Fix:** set the service instance's `dockerfilePath` via the GraphQL API and the variable `RAILWAY_DOCKERFILE_PATH`. The next deploy built from `deploy/railway/Dockerfile` and went live. Recipe in `deploy/railway/README.md`.
+
+## 2026-10-23: a silent WebSocket costs up to 75 s of blackout
+
+- **What happened:** enabling `ufw` on host A left both the recorder's and the keeper's Strike WebSockets ESTABLISHED, but with no data flowing.
+  - The keeper's own staleness check flagged index/mark as stale more than 3 s after the last update, and it stood down as designed.
+  - The sockets were only replaced when `ReconnectingSocket`'s idle timeout fired, after 75 s of silence. That figure is sized to Strike's 54 s ping interval.
+- **Proposed fix:** give each socket an idle timeout that matches its guaranteed traffic.
+  - The price socket carries `markprice@1s` for every symbol, so about 10 s.
+  - L3 on NIGHT-USD and ADA-USD carries about 55 updates a second, so about 20 s.
+  - Thread `idleTimeoutMs` through `L3FeedOptions`, and set it in the keeper, the watchdog and the recorder.

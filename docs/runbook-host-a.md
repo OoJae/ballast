@@ -67,10 +67,13 @@ sudo systemctl start ballast-keeper
 
 The anchor wallet key is not on the host yet. Move it here, under this host's KEK, when daily anchoring starts.
 
+## Hardening (applied 2026-10-23)
+
+- **Pre-installed agent gateway:** the image's agent gateway (`hermes-gateway`, a user service of `ubuntu`) is stopped and disabled.
+- **SSH:** `/etc/ssh/sshd_config.d/00-ballast-hardening.conf` turns off password login, keyboard-interactive login and root login. Keys only. Revert by deleting that file.
+- **Firewall:** `ufw` is on, with incoming traffic denied by default and only 22/tcp allowed. Outgoing traffic is allowed. The keeper and the recorder need no inbound ports.
+- **Side effect:** enabling `ufw` left the already-open Strike WebSockets silently dead. Both services stood down safely and reconnected after the 75 s idle timeout (FRICTION, 2026-10-23).
+
 ## Still open
 
 - **Host B (watchdog):** a second eligible host with a different provider, needed before any account is armed.
-- **Hardening:**
-  - Disable SSH password and root login.
-  - Remove or disable the image's pre-installed agent gateway, which runs as `ubuntu` with sudo.
-  - Enable the host firewall (the keeper exposes no inbound ports).
