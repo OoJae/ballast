@@ -17,8 +17,11 @@ Nothing here arms the keeper or places an order. Every funding step is signed by
    your own machine in a jurisdiction that is not on
    [Strike's restricted list](https://www.strikefinance.org/restricted), never on a read-only
    host (Sonar-VPS2, Railway). No VPN or proxy.
-3. **Builder code.** D0 must be done: the code `ballast` is registered and active in the Strike
-   app. Otherwise Builder Connect answers `404 builder code not found`.
+3. **Builder code.** D0 is done: the code was registered on 2026-10-23 as `ballast`, with a 10 bps
+   cap, and shows Active. The Strike app displays it as "Ballast", which may only be styling.
+   `HOLDER_BUILDER_CODE` defaults to `ballast`. If Builder Connect answers
+   `404 builder code not found`, re-run with `HOLDER_BUILDER_CODE=Ballast`. The challenge request
+   fails before anything is signed, so the retry costs nothing. Record which spelling Strike accepts.
 4. **Wallets.** In Lace, add a **fresh account** that has never been used on Strike. Send it
    about 30 ADA: 10 for the deposit, about 2 plus fees for the withdrawal's funding transaction,
    the rest for fees. For the USDM run of D5, also send it a few USDM. Do the same later with a
