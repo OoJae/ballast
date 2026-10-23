@@ -92,3 +92,19 @@ _(started 2026-10-23; the segment manifest and hourly roots live in `data/record
 - Recorded fills: 2 re-matched taker buys, and 25 recorded bids that opened at or over a Ballast ask (see FRICTION).
 - Stand-downs over the recorded window: 152 requotes found no non-Ballast ask (NIGHT's ask side was empty), and 121 had a fragile long under P2-blind mode.
 - **Exit criterion not yet met:** M3 asks for a 7-day replay, and only 3.5 h are recorded so far.
+
+## D10: cover oracle, live (2026-10-23, read-only Koios, 10 min)
+
+Verdict: **FAIL, for missing prerequisites; to re-run.**
+- Evidence: `data/dayone/d10-live-20261023T075425Z.json`.
+- Subject: holder #0's stake key, `stake1u8gesvq0fy6r6xcpt569yznrjcfdyux7j7ptd46f9qclz5gp23ddv`.
+
+| Check                   | Result                                                                                                                                   |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Single binding enforced | **pass.** A second account on the same stake key was refused both in memory and by the evidence DB's UNIQUE(stake_cred).                 |
+| Latency measured        | **pass.** 120 polls; 28 blocks observed; Koios read latency p50 1.1 s, max 2.4 s.                                                        |
+| Mempool spend → r = 0   | **untested.** No Ogmios endpoint (`BALLAST_OGMIOS_URL` unset), and holder #0 holds no UTxOs yet, so the matcher had nothing to exercise. |
+
+To re-run:
+- once holder #0 holds NIGHT cover (two base addresses on its stake key would also exercise the grouping test);
+- and either with an Ogmios source, or by accepting the plan's fallback of per-block Koios polling with the cancel-first path.
