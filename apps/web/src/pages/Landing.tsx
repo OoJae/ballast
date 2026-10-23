@@ -232,7 +232,7 @@ export function Landing() {
               </Link>
             </div>
             <p className="lp-status">
-              Pilot · holder #0 onboarded · test orders only, no fills yet
+              Pilot · holder #0 onboarded · first covered fill on 23 Oct (a labelled test)
             </p>
           </div>
           <figure className="lp-figure">
@@ -411,8 +411,8 @@ export function Landing() {
             <h3>Proof of Conduct</h3>
             <p>
               Every quoting order will be a <code>bal_</code> order tied to a signed policy. So far
-              there are only labelled day-one test orders (<code>bal_d…</code>), all cancelled; the
-              keeper's log holds two signed entries: the policy activation and the anchor.{" "}
+              there are only labelled day-one test orders (<code>bal_d…</code>) and one test fill;
+              the keeper's log holds two signed entries: the policy activation and the anchor.{" "}
               <Link to="/conduct">Read the log</Link>.
             </p>
           </article>
@@ -437,9 +437,10 @@ export function Landing() {
         </div>
         <ul className="lp-limits">
           <li>
-            No covered fill yet. Holder #0, the team's own account, is onboarded with 1,284.9 NIGHT
-            of cover; its only orders so far were day-one test asks placed 4% above the mark and
-            cancelled.
+            Ballast is not quoting yet. Holder #0, the team's own account, is onboarded with 1,284.9
+            NIGHT of cover. Its only fill so far is a labelled test: a 272 NIGHT ask at the mark,
+            bought by the team's probe account, which earned the maker rebate and paid the builder
+            fee.
           </li>
           <li>
             The flow is thin: over the first 7.2 recorded hours, L3 showed 2 taker buys on

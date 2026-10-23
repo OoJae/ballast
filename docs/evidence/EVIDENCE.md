@@ -237,3 +237,12 @@ The result is `VERIFY PASS`, with every implemented check passing:
 - **CANCELED on the user stream: p50 285 ms, p99 814 ms.**
 - In 98 of 100 trials the order was already gone from L3 when the stream confirmed. The check is sequential, so the L3 figure (same percentiles) is an upper bound.
 - No 429, nonce or "already processed" interference from the concurrent cancels; 0 unconfirmed.
+
+**D4 with a fresh wallet (the probe): the 404 → 200 flip.** One CIP-8 signature through `/join` made Strike **create** the probe wallet's account. `GET /v2/account?blockchain_address=` went **404 at 10:40:11 UTC → 200 at 11:09:41 UTC**, with Ballast's API key registered on it. The probe then deposited 102 ADA in-app (quoted $21.50, credited **$21.11**, about 1.8% conversion cost).
+
+**D3, the first covered maker fill: builder fee charged; builder balance not checked** (evidence `data/dayone/d3-live-20261023T111642Z.json`).
+- Holder #0 rested one post-only ask of 272 NIGHT at **0.038618**. That is ceil(mark), above the liquidation-aware floor of 0.037845 and below every other ask, so it was **the best ask on NIGHT-USD**.
+- The probe, a separate master family, bought exactly that from Strike's own app (Limit, IOC). Strike: "Order Filled: Bought 272 NIGHT at avg. price $0.038618".
+- The maker side recorded trade **2260736**, `maker: true`, 272 at 0.038618, fee **−0.000525** (the maker rebate) and **`builder_fee: 0.01`** (10 bps of $10.50).
+- The builder account's balance check needs its key, which this run did not have, so that half of the pass condition is unverified. The trade is labelled PROBE and excluded from KPIs.
+- **Position after D3:** holder #0 is short 272 NIGHT on Strike, covered by 1,284.9 NIGHT in its wallet (r × cover = 642 NIGHT). It is closed reduce-only in D9.
