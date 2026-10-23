@@ -137,7 +137,12 @@ function checkActivations(
       else activations += 1;
       continue;
     }
-    const createOps = (d.ops ?? []).filter((o) => o.clientOrderId !== undefined);
+    // Invariant 2 governs asks. Reduce-only buy-backs (every Ballast buy) are risk-reducing and,
+    // like cancels, need no policy in force: the Guard exempts them (plan section 6), so a
+    // buy-back after a policy expired is correct behaviour, not a violation.
+    const createOps = (d.ops ?? []).filter(
+      (o) => o.clientOrderId !== undefined && o.side !== "buy",
+    );
     if (createOps.length === 0 || d.seq < range.from || d.seq > range.to) continue;
     if (account !== undefined && d.accountId !== account) continue;
     creates += createOps.length;
