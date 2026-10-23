@@ -233,6 +233,9 @@ importers:
       '@ballast/engine':
         specifier: workspace:*
         version: link:../engine
+      '@ballast/governance':
+        specifier: workspace:*
+        version: link:../governance
       '@ballast/guard':
         specifier: workspace:*
         version: link:../guard

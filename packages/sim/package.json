@@ -10,6 +10,7 @@
   "dependencies": {
     "@ballast/core": "workspace:*",
     "@ballast/engine": "workspace:*",
+    "@ballast/governance": "workspace:*",
     "@ballast/guard": "workspace:*",
     "@ballast/market": "workspace:*",
     "@ballast/strike-client": "workspace:*"
