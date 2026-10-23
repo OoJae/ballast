@@ -120,6 +120,24 @@ importers:
         specifier: ^10.6.0
         version: 10.6.0
 
+  packages/sim:
+    dependencies:
+      '@ballast/core':
+        specifier: workspace:*
+        version: link:../core
+      '@ballast/engine':
+        specifier: workspace:*
+        version: link:../engine
+      '@ballast/guard':
+        specifier: workspace:*
+        version: link:../guard
+      '@ballast/market':
+        specifier: workspace:*
+        version: link:../market
+      '@ballast/strike-client':
+        specifier: workspace:*
+        version: link:../strike-client
+
   packages/strike-client:
     dependencies:
       ws:

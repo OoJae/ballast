@@ -1,0 +1,17 @@
+{
+  "name": "@ballast/sim",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Deterministic L3 replay simulator, stress library and the Critic's runCritic",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@ballast/core": "workspace:*",
+    "@ballast/engine": "workspace:*",
+    "@ballast/guard": "workspace:*",
+    "@ballast/market": "workspace:*",
+    "@ballast/strike-client": "workspace:*"
+  }
+}
