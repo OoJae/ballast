@@ -1,0 +1,13 @@
+{
+  "name": "@ballast/recorder",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@ballast/core": "workspace:*",
+    "@ballast/evidence": "workspace:*",
+    "@ballast/strike-client": "workspace:*",
+    "pino": "^10.3.1",
+    "zod": "^4.4.3"
+  }
+}

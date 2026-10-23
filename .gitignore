@@ -1,0 +1,23 @@
+node_modules/
+.env
+.env.*
+!.env.example
+data/
+*.sqlite
+*.sqlite-journal
+*.sqlite-shm
+*.sqlite-wal
+dist/
+coverage/
+.DS_Store
+.vite/
+
+# Internal working docs: agent instructions, strategy and research notes. Kept on disk, never published.
+/CLAUDE.md
+docs/battle-plan.md
+docs/research/
+docs/memo-to-strike.md
+
+# Browser-automation page snapshots (may contain account data)
+.playwright-mcp/
+/buildplan.md
