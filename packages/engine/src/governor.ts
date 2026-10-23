@@ -122,6 +122,7 @@ export function govern(input: GovernorInput): GovernorResult {
     spacingBps: policy.pricing.levelSpacingBps.slice(0, levels - 1).map(BigInt),
     levels,
     bestAskTicks: input.book.asks[0] ? ticks(input.book.asks[0].px) : null,
+    bestBidTicks: input.book.bids[0] ? ticks(input.book.bids[0].px) : null,
     minImprovementBps: BigInt(policy.pricing.minImprovementBps),
     rations: policyRations(money.l1Refill),
     rate: market.rate,

@@ -39,6 +39,8 @@ export interface LadderInput {
   p2SafeTicks?: Ticks | null;
   /** ceil(mark) when the floor must also clear the mark (P2-blind mode, stale positions). */
   markTicks?: Ticks | null;
+  /** Best bid in the book without Ballast: a post-only ask must sit strictly above it. */
+  bestBidTicks?: Ticks | null;
   index: RefPrice;
   /** max(policy, market) minimum offset over index. */
   minOffsetBps: bigint;
@@ -65,7 +67,8 @@ export function maxL1Ticks(bestAskTicks: Ticks, minImprovementBps: bigint): Tick
 }
 
 /**
- * L1 = ceil_tick(max(F, P2-safe, index × (1 + offset))), L(i+1) = ceil_tick(L1 × (1 + s_i)).
+ * L1 = ceil_tick(max(F, P2-safe, index × (1 + offset))), L(i+1) = ceil_tick(L1 × (1 + s_i)), and
+ * L1 is at least one tick over the best bid, where a post-only ask can rest at all.
  * Armed only while L1 ≤ best non-Ballast ask − minImprovement; otherwise Ballast would not
  * improve the book and stands down. Sizes are the rations at each level's price.
  */
@@ -81,6 +84,7 @@ export function buildLadder(input: LadderInput): LadderResult {
   let l1 = maxBigint(input.floorTicks, fromIndex);
   if (input.p2SafeTicks) l1 = maxBigint(l1, input.p2SafeTicks);
   if (input.markTicks) l1 = maxBigint(l1, input.markTicks);
+  if (input.bestBidTicks) l1 = maxBigint(l1, input.bestBidTicks + 1n);
   const l1t = ticks(l1);
   if (input.bestAskTicks === null) {
     return { ok: false, reason: "no-reference-ask", detail: "no non-Ballast ask", l1: l1t };
