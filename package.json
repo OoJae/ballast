@@ -17,7 +17,10 @@
     "recorder": "tsx apps/recorder/src/main.ts",
     "recorder:verify": "tsx apps/recorder/src/verify.ts",
     "book-health": "tsx apps/cli/src/book-health.ts",
-    "api:dev": "tsx watch apps/api/src/main.ts"
+    "api:dev": "tsx watch apps/api/src/main.ts",
+    "web:dev": "pnpm --filter @ballast/web run dev",
+    "web:build": "pnpm --filter @ballast/web run build",
+    "web:typecheck": "tsc --noEmit -p apps/web/tsconfig.json && tsc --noEmit -p apps/web/tsconfig.node.json"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.6",

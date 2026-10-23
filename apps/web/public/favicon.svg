@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <title>Ballast</title>
+  <path d="M5 17a11 11 0 0 0 22 0z" fill="#c99a3a"/>
+  <circle cx="16" cy="16" r="10.5" fill="none" stroke="#8a94a6" stroke-width="2.5"/>
+  <rect x="1.5" y="14.75" width="29" height="2.5" rx="1.25" fill="#8a94a6"/>
+</svg>

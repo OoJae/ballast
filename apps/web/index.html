@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#0a0f18" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f6f4ee" media="(prefers-color-scheme: light)" />
+    <meta
+      name="description"
+      content="Ballast: Cardano holders as Strike's second market maker. Every quote covered by coins in a Cardano wallet, checkable block by block on Koios and order by order on L3."
+    />
+    <title>Ballast · covered liquidity for Strike</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <script>
+      // Apply the saved theme before first paint, so there is no flash.
+      try {
+        const saved = localStorage.getItem("ballast-theme");
+        if (saved === "light" || saved === "dark") document.documentElement.dataset.theme = saved;
+      } catch {
+        // Storage blocked: follow the OS theme.
+      }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>
+      <p style="padding: 24px; font-family: system-ui, sans-serif">
+        Ballast's public pages need JavaScript to read the replayed L3 book. The raw API is at
+        <code>/api/health</code>.
+      </p>
+    </noscript>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
