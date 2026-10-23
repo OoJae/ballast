@@ -24,7 +24,8 @@
     "ballast": "tsx apps/cli/src/main.ts",
     "verify": "tsx apps/cli/src/main.ts verify",
     "cover": "tsx apps/cli/src/main.ts cover",
-    "dayone": "tsx apps/cli/src/main.ts dayone"
+    "dayone": "tsx apps/cli/src/main.ts dayone",
+    "keys": "tsx apps/cli/src/main.ts keys"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.6",

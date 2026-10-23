@@ -7,12 +7,13 @@
     "@ballast/cardano": "workspace:*",
     "@ballast/core": "workspace:*",
     "@ballast/cover": "workspace:*",
+    "@ballast/engine": "workspace:*",
     "@ballast/evidence": "workspace:*",
     "@ballast/governance": "workspace:*",
     "@ballast/market": "workspace:*",
-    "@ballast/strike-client": "workspace:*",
     "@ballast/ops": "workspace:*",
-    "@ballast/engine": "workspace:*",
+    "@ballast/strike-client": "workspace:*",
+    "@emurgo/cardano-serialization-lib-nodejs": "^17.0.0",
     "ws": "^8.22.0"
   },
   "devDependencies": {

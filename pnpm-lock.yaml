@@ -93,6 +93,9 @@ importers:
       '@ballast/strike-client':
         specifier: workspace:*
         version: link:../../packages/strike-client
+      '@emurgo/cardano-serialization-lib-nodejs':
+        specifier: ^17.0.0
+        version: 17.0.0
       ws:
         specifier: ^8.22.0
         version: 8.22.0
