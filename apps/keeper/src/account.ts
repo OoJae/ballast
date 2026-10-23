@@ -4,7 +4,7 @@
  * resting), its silent-drop registry, and the keeper's per-account state (margin band, loss stop,
  * replace-batch spacing, L3 attribution).
  */
-import { type MicroUsd, microUsd } from "@ballast/core";
+import { type MicroUsd, microUsd, type RefPrice, type Steps } from "@ballast/core";
 import type { BandState } from "@ballast/engine";
 import {
   AccountReconciler,
@@ -104,11 +104,13 @@ export class AccountRuntime {
   housekeeping = false;
   /** Reduce-only buy-back in flight (client id), so at most one is outstanding. */
   buyBackInFlight: string | null = null;
-  loss: { day: number; dayStartValue: bigint | null; holdUntilMs: number | null } = {
-    day: -1,
-    dayStartValue: null,
-    holdUntilMs: null,
-  };
+  /** Loss stop: today's integrated combined-MTM PnL (µUSD) and the last sample it rests on. */
+  loss: {
+    day: number;
+    pnl: bigint;
+    prev: { equity: bigint; short: Steps; index: RefPrice } | null;
+    holdUntilMs: number | null;
+  } = { day: -1, pnl: 0n, prev: null, holdUntilMs: null };
 
   constructor(
     readonly ports: AccountPorts,

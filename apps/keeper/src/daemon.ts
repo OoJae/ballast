@@ -1255,15 +1255,22 @@ export function createDaemon(deps: KeeperDeps): KeeperDaemon {
     if (rt.loss.holdUntilMs !== null && now < rt.loss.holdUntilMs) return true;
     const index = decRef(m, mv.price?.index);
     if (!rt.margin || !index) return false;
-    // Combined MTM: the perp equity (short at mark inside it) plus the paired wallet coins.
-    // VERIFY: wallet coins are valued at Strike's index, not a CEX/DEX mid (FRICTION).
-    const value = rt.margin.equityMicroUsd + refValue(index, book.shortSteps, m);
+    // Combined MTM PnL, integrated tick by tick: the perp equity's change (marginBalance holds the
+    // short's PnL at mark) plus what the coins paired with the short earned at home over the step.
+    // Buying the short back is not a loss: the coins simply stop being paired.
+    // VERIFY: paired coins are valued at Strike's index, not a CEX/DEX mid (FRICTION 2026-10-23).
     const day = Math.floor(now / DAY_MS);
-    if (day !== rt.loss.day || rt.loss.dayStartValue === null) {
+    if (day !== rt.loss.day) {
       rt.loss.day = day;
-      rt.loss.dayStartValue = value;
+      rt.loss.pnl = 0n;
     }
-    const loss = maxBigint(0n, rt.loss.dayStartValue - value);
+    const prev = rt.loss.prev;
+    if (prev) {
+      const paired = refValue(index, prev.short, m) - refValue(prev.index, prev.short, m);
+      rt.loss.pnl += rt.margin.equityMicroUsd - prev.equity + paired;
+    }
+    rt.loss.prev = { equity: rt.margin.equityMicroUsd, short: book.shortSteps, index };
+    const loss = maxBigint(0n, -rt.loss.pnl);
     let limit: bigint = HOLDER0_LOSS_STOP;
     if (!rt.cfg.holder0) {
       if (!policy) return false;
