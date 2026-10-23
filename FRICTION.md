@@ -333,3 +333,8 @@ Dated notes on confusion, docs/API mismatches, and breakage, each with a propose
 - **Testnet BTC-USD has a $100 minimum notional** (`order_min_notional`), against $10 on mainnet NIGHT. The first D1 run had every create REJECTED at $10.50. The probe size now comes from the market's own rule (1.05 × minimum).
 - **Our own limiter refused D1's check (a) locally.** The client allows one replace-batch per account per 2 s, and the probe sent its first replace-batch right after the setup batch. Fix: D1 waits 2.5 s, and a check that never reached Strike is reported as untested, never as a pass or fail.
 - **An unknown symbol is accepted, then silently dropped.** `BTCX-USD` came back in `successful` with a sequence id and then 404'd. This confirms the silent-drop detector is needed for every create, not just for rate-limited ones.
+
+## 2026-10-23: Railway would not switch from Railpack to our Dockerfile
+
+- **Symptom:** the first deploy built with Railpack and failed ("No start command detected"). `railway.json` was ignored, and `railway environment edit --service-config ballast-public build.builder DOCKERFILE` answered "No changes to apply" while the config still read RAILPACK.
+- **Fix:** set the service instance's `dockerfilePath` via the GraphQL API and the variable `RAILWAY_DOCKERFILE_PATH`. The next deploy built from `deploy/railway/Dockerfile` and went live. Recipe in `deploy/railway/README.md`.
