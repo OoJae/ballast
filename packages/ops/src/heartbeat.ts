@@ -39,7 +39,8 @@ export interface HeartbeatBody {
   seq: number;
   tsMs: number;
   mode: "dry-run" | "armed";
-  state: "starting" | "running" | "stopping";
+  /** "stalled": the process is alive but its tick loop has not completed a tick lately. */
+  state: "starting" | "running" | "stalled" | "stopping";
   decisionHead: { seq: number; hash: string | null };
   accounts: HeartbeatAccount[];
 }

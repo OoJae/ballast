@@ -1,4 +1,5 @@
-import { refPrice } from "@ballast/core";
+import { refPrice, steps } from "@ballast/core";
+import { keeperStep, planRequote } from "@ballast/engine";
 import { DaemonKey } from "@ballast/governance";
 import { Grid } from "@ballast/market";
 import { HeartbeatMonitor, signHeartbeat } from "@ballast/ops";
@@ -150,8 +151,36 @@ describe("chaos: keeper crash", () => {
   }, 40_000);
 
   for (const rule of ["price", "cover"] as const) {
-    it(`a keeper that heartbeats but stopped acting: the ${rule} rule fires on the watchdog's own view`, async () => {
-      h = await startKeeper();
+    it(`a keeper that ticks and heartbeats but stopped acting: the ${rule} rule fires on the watchdog's own view`, async () => {
+      // A wedged keeper: its loop and heartbeat run, but it never cancels or requotes.
+      const bug = { on: false };
+      h = await startKeeper({
+        engine: {
+          keeper: (k) =>
+            bug.on
+              ? {
+                  actions: [],
+                  allowCreates: true,
+                  capacity: steps(0n),
+                  breach: false,
+                  buyBackPending: steps(0n),
+                  reasons: [],
+                }
+              : keeperStep(k),
+          plan: (i) => {
+            const p = planRequote(i);
+            return bug.on
+              ? {
+                  ...p,
+                  accounts: p.accounts.map((a) => ({
+                    ...a,
+                    diff: { kind: "none" as const, keep: [] },
+                  })),
+                }
+              : p;
+          },
+        },
+      });
       const x = h;
       const id = x.accounts[0]?.id as string;
       await activate(x);
@@ -161,8 +190,7 @@ describe("chaos: keeper crash", () => {
       await vi.waitFor(() => expect(restingAsks(x, id).length).toBeGreaterThan(0), {
         timeout: 15_000,
       });
-      // The keeper's loop stops but its heartbeat keeps coming (a wedged requote path).
-      await x.daemon.stop({ cancel: false });
+      bug.on = true;
       if (rule === "price") {
         // Index jumps: the resting ask is now below index + 20 bps.
         x.fake.market.setPrice(SYMBOL, { mark: "0.03870", index: "0.03865" });
@@ -178,6 +206,27 @@ describe("chaos: keeper crash", () => {
       expect(restingAsks(x, id)).toEqual([]);
     }, 40_000);
   }
+
+  it("a keeper that stopped its loop while still heartbeating is treated as dead", async () => {
+    h = await startKeeper();
+    const x = h;
+    const id = x.accounts[0]?.id as string;
+    await activate(x);
+    w = await startWatchdog(x, { deadlineMs: 1_500 });
+    x.daemon.start();
+    w.wd.start();
+    await vi.waitFor(() => expect(restingAsks(x, id).length).toBeGreaterThan(0), {
+      timeout: 15_000,
+    });
+    await x.daemon.stop({ cancel: false }); // heartbeats continue, saying "stopping"
+    const ww = w;
+    await vi.waitFor(
+      () => expect(ww.killLog.find((k) => k.rule === "heartbeat" && k.latency)).toBeDefined(),
+      { timeout: 20_000, interval: 100 },
+    );
+    expect(ww.monitor.latest()?.state).toBe("stopping");
+    expect(restingAsks(x, id)).toEqual([]);
+  }, 40_000);
 
   it("in DRY_RUN the watchdog only logs: nothing is cancelled", async () => {
     h = await startKeeper();

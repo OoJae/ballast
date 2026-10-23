@@ -228,7 +228,7 @@ export interface KeeperDaemon {
   onCoverProof(accountId: string, proof: CoverProof): void;
   heartbeatSnapshot(): {
     mode: "dry-run" | "armed";
-    state: "starting" | "running" | "stopping";
+    state: "starting" | "running" | "stalled" | "stopping";
     decisionHead: { seq: number; hash: string | null };
     accounts: { accountId: string; symbol: string; restingAsks: number; quoting: boolean }[];
   };
@@ -1837,9 +1837,13 @@ export function createDaemon(deps: KeeperDeps): KeeperDaemon {
   }
 
   function heartbeatSnapshot() {
+    // A live process whose loop has not ticked in 10 s is not a live keeper: say so, and the
+    // watchdog treats it as dead.
+    const stalled =
+      phase === "running" && (state.lastTickMs === null || clock.now() - state.lastTickMs > 10_000);
     return {
       mode: cfg.mode,
-      state: phase,
+      state: stalled ? ("stalled" as const) : phase,
       decisionHead: log.head(),
       accounts: accounts.map((rt) => ({
         accountId: rt.id,

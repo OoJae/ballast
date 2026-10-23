@@ -138,6 +138,26 @@ describe("SAFETY PROOF: the keeper's signer is reached only through the Guard", 
   });
 });
 
+describe("heartbeat: a stalled tick loop says so", () => {
+  it("reports 'stalled' when a tick has hung for more than 10 s (the watchdog then fires)", async () => {
+    const r = rig();
+    let release: () => void = () => {};
+    r.spy.replaceBatch.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          release = () => resolve({});
+        }),
+    );
+    r.daemon.start();
+    await vi.waitFor(() => expect(r.spy.replaceBatch).toHaveBeenCalled(), { timeout: 5_000 });
+    expect(r.daemon.heartbeatSnapshot().state).toBe("running");
+    r.clock.t += 11_000;
+    expect(r.daemon.heartbeatSnapshot().state).toBe("stalled");
+    release();
+    await r.daemon.stop({ cancel: false });
+  });
+});
+
 describe("SAFETY PROOF: DRY_RUN never sends", () => {
   it("records 'would place' with every rule evaluated and passed, and calls no signer method", async () => {
     const r = rig({ config: { dryRun: true, armed: false, mode: "dry-run" } });

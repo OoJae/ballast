@@ -415,7 +415,9 @@ export function createWatchdog(deps: WatchdogDeps): Watchdog {
     const hb = deps.monitor;
     const f = facts();
     const decisions = evaluateWatchdog({
-      heartbeatAlive: hb.alive(),
+      // A stalled or stopping keeper heartbeats but no longer manages its asks.
+      heartbeatAlive:
+        hb.alive() && (hb.latest()?.state === "running" || hb.latest()?.state === "starting"),
       armedForHeartbeat: clock.now() - startedAt >= deadlineMs,
       heartbeatAgeMs: hb.ageMs(),
       floorTicks: f.floorTicks,
