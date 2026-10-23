@@ -1,3 +1,4 @@
+import { canonicalize, sha256Hex } from "@ballast/core";
 import * as CSL from "@emurgo/cardano-serialization-lib-nodejs";
 import { merkleRootHex } from "./merkle.js";
 
@@ -85,6 +86,15 @@ export function anchorRoots(decisionHashes: readonly string[], segmentHashes: re
   const decisionsRoot = merkleRootHex(decisionHashes);
   const segmentsRoot = merkleRootHex(segmentHashes);
   return { decisionsRoot, segmentsRoot, root: merkleRootHex([decisionsRoot, segmentsRoot]) };
+}
+
+/**
+ * The `inputsDigest` of the signed "anchor" decision that commits to an anchor record: every
+ * field except `txHash`, which is only known after submission (and is checked on chain).
+ */
+export function anchorRecordDigest<T extends { txHash?: string | null }>(record: T): string {
+  const { txHash: _later, ...committed } = record;
+  return sha256Hex(canonicalize(committed));
 }
 
 /** Protocol parameters the fee and min-UTxO math needs (from Koios `epoch_params`). */

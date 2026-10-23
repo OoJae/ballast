@@ -26,6 +26,8 @@ export interface CoverProof {
   utxos: { ref: string; address: string; quantity: string; createdHeight: number }[];
   excluded: { ref: string; reason: ExclusionReason; quantity: string }[];
   coverBase: string;
+  /** Other assets also named NIGHT on eligible UTxOs: seen, reported, never counted. */
+  lookalikeBase: string;
   checkedAtMs: number;
   hash: string;
 }
@@ -60,6 +62,7 @@ export function buildCoverProof(
       quantity: e.quantity.toString(),
     })),
     coverBase: c.coverBase.toString(),
+    lookalikeBase: c.lookalikeBase.toString(),
     checkedAtMs,
   };
   return { ...body, hash: coverProofHash(body) };
