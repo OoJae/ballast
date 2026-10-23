@@ -4,9 +4,19 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./db": "./src/db.ts",
+    "./anchor": "./src/anchor.ts",
+    "./bundle": "./src/bundle.ts"
   },
   "dependencies": {
-    "@ballast/core": "workspace:*"
+    "@ballast/core": "workspace:*",
+    "@ballast/cover": "workspace:*",
+    "@ballast/governance": "workspace:*",
+    "@emurgo/cardano-serialization-lib-nodejs": "^17.0.0",
+    "better-sqlite3": "^13.0.3"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0"
   }
 }

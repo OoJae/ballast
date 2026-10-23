@@ -1,0 +1,16 @@
+{
+  "name": "@ballast/governance",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Signed policies, renewal envelopes, the Critic gate, the decision chain and the non-blocking Advisor",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./advisor": "./src/advisor/index.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.1.0",
+    "@ballast/core": "workspace:*",
+    "zod": "^4.4.3"
+  }
+}

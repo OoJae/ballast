@@ -4,6 +4,10 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@ballast/core": "workspace:*",
+    "@ballast/cover": "workspace:*",
+    "@ballast/evidence": "workspace:*",
+    "@ballast/governance": "workspace:*",
     "@ballast/market": "workspace:*",
     "@ballast/strike-client": "workspace:*"
   }

@@ -146,3 +146,51 @@ Dated notes on confusion, docs/API mismatches, and breakage, each with a propose
 - **Docs:** liquidations.md calls a profile bankrupt when base balance **or** margin balance is ≤ 0. **Skill:** only MB ≤ 0.
 - **Recorded:** an isolated NIGHT long with a negative `isolated_margin` is still open, and its served LP matches the formula.
 - **Fix:** `riskLevel` follows the skill (`// VERIFY`). Ask Strike which one is right.
+## 2026-10-23: Koios tip and UTxO set are separate reads (M4 cover oracle)
+
+- **Docs:** `/tip` and `/account_utxos` are separate PostgREST queries; nothing says they share a snapshot. Verified live: `tip` returns `block_height`; `account_utxos` with `_extended: true` returns `asset_list` and `block_height` per UTxO.
+- **What M4 does:** `CoverOracle` reads the tip, then the UTxOs, then the tip again, and only builds a proof when both tip hashes match (up to 3 retries, then it refuses). UTxOs created above the proof height are excluded. `// VERIFY:` in `packages/cover/src/oracle.ts`.
+- **Fix:** in D10, measure how often the UTxO view lags the tip, and add Blockfrost as a second provider for cross-checks.
+
+## 2026-10-23: Koios paging past 1000 rows on POST RPC endpoints is unexercised
+
+- **Docs:** offset/limit paging applies to "any endpoint", 1000 rows per page; the public tier caps request bodies at 1 KB and bursts at 100 requests per 10 s.
+- **What M4 does:** follows pages until a short page, refuses more than 200 pages rather than return a partial set, and splits address lists to stay under 1000 bytes. `// VERIFY:` in `packages/cover/src/koios.ts`.
+- **Fix:** run the oracle on a wallet with more than 1000 UTxOs before outside holders onboard.
+
+## 2026-10-23: Proof of Cover cannot yet prove a UTxO's spend height
+
+- **Docs:** `utxo_info` reports `is_spent` now, not the height of the spending transaction.
+- **What M4 does:** `recheckCoverProof` confirms every UTxO ref, address, NIGHT quantity and creation height, and lists UTxOs spent since. A proof stays valid if the spend landed after its height, but v1 does not look the spending transaction up. `// VERIFY:` in `packages/cover/src/proof.ts`.
+- **Fix:** resolve spenders via Koios `tx_info` (inputs) and compare their `block_height` with the proof's.
+
+## 2026-10-23: Ogmios mempool spend detection is a stub
+
+- **What M4 does:** `packages/cover/src/ogmios.ts` defines `MempoolSpendSource`, a stub that never emits, and a tested matcher that sets r = 0 for any proof whose UTxO a pending transaction spends. The Ogmios v6 LocalTxMonitor calls (`acquireMempool`, `nextTransaction`, `releaseMempool`) are from memory. `// VERIFY:`.
+- **Fix:** provision Ogmios (or a hosted equivalent), check the protocol against its docs, and run D10's mempool test.
+
+## 2026-10-23: NIGHT sits at Byron addresses that cannot bind a stake credential
+
+- **Measured (Koios `asset_addresses`, first page, aggregate only):** the first 20 holders of the pinned NIGHT asset were all Byron (`Ae2…`) addresses. Byron addresses carry no stake credential, so Ballast cannot bind them to an account.
+- **What M4 does:** the oracle reports Byron UTxOs as excluded (`byron`), and `ballast cover` refuses a Byron input with a clear message.
+- **Fix:** onboarding copy should tell Byron holders to move NIGHT to a Shelley (`addr1…`) address first. Measure how much NIGHT sits at Byron addresses before quoting the "86,040 staked wallets" figure next to total supply.
+
+## 2026-10-23: the recorder deploy now installs native and wasm dependencies
+
+- **What happened:** `ops/deploy-recorder.sh` runs a workspace-wide `pnpm install --frozen-lockfile` on read-only hosts. M4 adds better-sqlite3 (native build), cardano-serialization-lib (wasm) and the Anthropic SDK to the workspace. The recorder never imports them: `@ballast/evidence` keeps the SQLite store and anchoring behind subpaths (`/db`, `/anchor`, `/bundle`).
+- **Fix:** change the deploy to `pnpm install --frozen-lockfile --filter @ballast/recorder...` so read-only hosts install only the recorder's graph. Not changed in M4, because the live recorder runs from the main checkout.
+
+## 2026-10-23: Guard trips in the bundle are not yet signed
+
+- **What M4 does:** renewals are refused after a safety-class Guard trip, and `ballast verify` re-checks every renewal against the bundle's `guard-trips.jsonl`. Adding a trip makes verification stricter, but deleting one cannot be detected yet, because trips are stored rows, not signed records.
+- **Fix:** when the Guard lands (M3), record each trip in its decision record's `guard.violations` and have `verify` derive trips from the signed chain only.
+
+## 2026-10-23: the Advisor's API call is not yet exercised live
+
+- **What M4 does:** `createAnthropicLlm` follows the claude-api skill and the `@anthropic-ai/sdk` 1.1.0 types: `claude-opus-5-5` (thinking cannot be disabled, so effort is `low`), server-side fallback (`fallbacks: "default"`, beta `server-side-fallback-2026-07-01`), a 20 s abort and no SDK retries. Tests use a fake client; no key was available. `// VERIFY:` in `packages/governance/src/advisor/llm.ts`.
+- **Fix:** on the first run with `BALLAST_ADVISOR=on`, confirm the request is accepted and a refusal or timeout produces no note.
+
+## 2026-10-23: M4 exit needs a preprod anchor transaction (human step)
+
+- **What M4 does:** `buildAnchorTx` builds and signs a CIP-20 self-send offline (tested against preprod-format data with protocol parameters read from Koios for preprod epoch 321 and mainnet epoch 663). Nothing submits it.
+- **Fix:** an operator funds a fresh preprod anchor wallet from the faucet, builds one anchor with these tools, submits it by hand, and records the tx hash in EVIDENCE.md. Mainnet anchoring needs the ≤ 20 ADA hot wallet and an explicit go-ahead.
