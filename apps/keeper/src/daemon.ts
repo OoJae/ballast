@@ -1133,6 +1133,15 @@ export function createDaemon(deps: KeeperDeps): KeeperDaemon {
       body,
       builderFeeBps: 0,
     };
+    const g = checkRiskReducing({ request, profile: "AUTONOMOUS", flags: { dryRun: cfg.dryRun } });
+    append({
+      kind: "kill",
+      accountId: rt.id,
+      inputsDigest: hashOf({ retryOf: k.dbId, reason: k.reason, sentAtMs: k.sentAtMs }),
+      inputsRef: null,
+      ops: [{ route: "DELETE /v2/order/cancel-all" }],
+      guard: guardSummary(g),
+    });
     try {
       await guardedCancel({ request, profile: "AUTONOMOUS", flags: { dryRun: cfg.dryRun } }, () =>
         rt.ports.signer.cancelAll(body),
@@ -1142,6 +1151,19 @@ export function createDaemon(deps: KeeperDeps): KeeperDaemon {
     }
     try {
       const open = await rt.ports.reads.openOrders(k.symbol);
+      if (open.orders.length > 0) {
+        append({
+          kind: "kill",
+          accountId: rt.id,
+          inputsDigest: hashOf({ retryOf: k.dbId, perOrder: open.orders.map((o) => String(o.ID)) }),
+          inputsRef: null,
+          ops: open.orders.map((o) => ({
+            route: "DELETE /v2/order/cancel",
+            cancelOrderId: String(o.ID),
+          })),
+          guard: guardSummary(g),
+        });
+      }
       for (const o of open.orders) {
         const cancel = { symbol: k.symbol, order_id: BigInt(o.ID) };
         const req: GuardRequest = {

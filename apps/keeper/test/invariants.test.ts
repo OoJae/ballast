@@ -171,6 +171,10 @@ describe("invariant 11: a kill is confirmed on both stream and L3, or retried an
     const cancels = keeperRequests(x).filter((r) => r.target === "/v2/order/cancel-all");
     expect(cancels.length).toBeGreaterThanOrEqual(2);
     expect(keeperRequests(x).some((r) => r.target === "/v2/order/cancel")).toBe(true);
+    // Every step of the kill path is a signed decision record, the retry included.
+    const kills = x.db.decisions().filter((d) => d.kind === "kill");
+    expect(kills.length).toBeGreaterThanOrEqual(3);
+    expect(kills.some((d) => d.ops?.some((o) => o.route === "DELETE /v2/order/cancel"))).toBe(true);
     await vi.waitFor(
       () =>
         expect(x.db.raw.prepare("SELECT status FROM kills").get()).toEqual({ status: "escalated" }),
