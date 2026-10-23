@@ -48,6 +48,14 @@ export {
   type PremiumIndex,
   type PublicReads,
 } from "./reads.js";
+export {
+  AccountReconciler,
+  type Exposure,
+  type ReconcilerOptions,
+  resyncAccount,
+  type TrackedOrder,
+  type TrackedStatus,
+} from "./reconcile.js";
 export { checkRoute, type ProfileName, type RouteCheck, type SignerProfile } from "./routes.js";
 export { ApiWalletSigner, publicKeyHex } from "./sign.js";
 export type { SignedClientAlarm } from "./transport.js";
@@ -55,6 +63,7 @@ export type {
   CancelAllResponse,
   CancelOrderResponse,
   OpenOrdersResponse,
+  PositionsResponse,
   StrikeOrder,
 } from "./types.js";
 export {

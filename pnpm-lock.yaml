@@ -133,6 +133,49 @@ importers:
         specifier: ^4.4.3
         version: 4.6.7
 
+  apps/watchdog:
+    dependencies:
+      '@ballast/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@ballast/cover':
+        specifier: workspace:*
+        version: link:../../packages/cover
+      '@ballast/engine':
+        specifier: workspace:*
+        version: link:../../packages/engine
+      '@ballast/evidence':
+        specifier: workspace:*
+        version: link:../../packages/evidence
+      '@ballast/governance':
+        specifier: workspace:*
+        version: link:../../packages/governance
+      '@ballast/guard':
+        specifier: workspace:*
+        version: link:../../packages/guard
+      '@ballast/market':
+        specifier: workspace:*
+        version: link:../../packages/market
+      '@ballast/ops':
+        specifier: workspace:*
+        version: link:../../packages/ops
+      '@ballast/strike-client':
+        specifier: workspace:*
+        version: link:../../packages/strike-client
+      pino:
+        specifier: ^10.3.1
+        version: 10.4.0
+      zod:
+        specifier: ^4.4.3
+        version: 4.6.7
+    devDependencies:
+      '@ballast/fake-strike':
+        specifier: workspace:*
+        version: link:../../packages/fake-strike
+      '@ballast/keeper':
+        specifier: workspace:*
+        version: link:../keeper
+
   apps/web:
     dependencies:
       lightweight-charts:

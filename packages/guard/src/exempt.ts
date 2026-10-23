@@ -10,6 +10,8 @@
 import { checkRoute, type ProfileName, type RouteCheck } from "@ballast/strike-client/routes";
 import type { GuardCheck, GuardRequest, GuardResult, GuardViolation } from "./types.js";
 
+export type { GuardRequest, GuardResult } from "./types.js";
+
 /** Cancels, cancel-all, cancel-only replace-batches and the reduce-only IOC buy-back. */
 export function riskReducing(route: RouteCheck): boolean {
   if (!route.ok) return false;
