@@ -57,7 +57,31 @@ importers:
         specifier: ^4.4.3
         version: 4.6.7
 
-  packages/core: {}
+  packages/core:
+    dependencies:
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
+    devDependencies:
+      '@ballast/market':
+        specifier: workspace:*
+        version: link:../market
+
+  packages/engine:
+    dependencies:
+      '@ballast/core':
+        specifier: workspace:*
+        version: link:../core
+      '@ballast/market':
+        specifier: workspace:*
+        version: link:../market
+      '@ballast/strike-client':
+        specifier: workspace:*
+        version: link:../strike-client
+    devDependencies:
+      '@ballast/fake-strike':
+        specifier: workspace:*
+        version: link:../fake-strike
 
   packages/evidence:
     dependencies:
@@ -70,6 +94,22 @@ importers:
       ws:
         specifier: ^8.22.0
         version: 8.22.0
+
+  packages/guard:
+    dependencies:
+      '@ballast/core':
+        specifier: workspace:*
+        version: link:../core
+      '@ballast/engine':
+        specifier: workspace:*
+        version: link:../engine
+      '@ballast/strike-client':
+        specifier: workspace:*
+        version: link:../strike-client
+    devDependencies:
+      '@ballast/market':
+        specifier: workspace:*
+        version: link:../market
 
   packages/market:
     dependencies:
