@@ -246,6 +246,10 @@ describe("chaos: keeper crash", () => {
       interval: 100,
     });
     expect(restingAsks(x, id).length).toBeGreaterThan(0);
+    // An armed keeper under a dry-run watchdog is flagged: there is no second kill path.
+    expect(
+      ww.notifier.alerts.some((a) => /ARMED but this watchdog runs in DRY_RUN/.test(a.title)),
+    ).toBe(true);
     for (const key of ww.keys) {
       expect(
         x.fake.requests.filter(

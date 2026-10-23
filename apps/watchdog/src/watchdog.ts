@@ -409,7 +409,20 @@ export function createWatchdog(deps: WatchdogDeps): Watchdog {
     }
   }
 
+  let warnedUnguarded = false;
+
   async function tick(): Promise<FireDecision[]> {
+    // An armed keeper watched by a dry-run watchdog has no safety net: page once.
+    if (cfg.dryRun && deps.monitor.latest()?.mode === "armed" && !warnedUnguarded) {
+      warnedUnguarded = true;
+      notify({
+        kind: "error",
+        source: "watchdog",
+        severity: "page",
+        title: "the keeper is ARMED but this watchdog runs in DRY_RUN: no second kill path",
+        symbol,
+      });
+    }
     for (const w of watched) void resync(w);
     attribute();
     const hb = deps.monitor;
@@ -480,6 +493,9 @@ export function createWatchdog(deps: WatchdogDeps): Watchdog {
       if (!mv.l3Synced) problems.push("watchdog L3 not synced");
       if (mv.indexAgeMs > 3_000) problems.push("watchdog index stale");
       if (!deps.monitor.alive()) problems.push("keeper heartbeat missing");
+      if (cfg.dryRun && deps.monitor.latest()?.mode === "armed") {
+        problems.push("keeper armed, watchdog in DRY_RUN");
+      }
       for (const w of watched)
         if (!w.ports.streamLive()) problems.push(`${w.ports.cfg.accountId}: watchdog stream down`);
       return {
