@@ -1,0 +1,45 @@
+# Ballast keeper (host A). systemd user unit; install to ~/.config/systemd/user/.
+#
+# HOSTING RULE (CLAUDE.md): this process signs Strike requests (orders, cancels, signed reads,
+# the user-stream logon). It MUST run on a host that is NOT in any of Strike's restricted
+# jurisdictions (https://www.strikefinance.org/restricted): the operator's own machine, or a
+# provider region such as Tel Aviv or the UAE. Never on Sonar-VPS2 (US) or Railway (US, NL, SG),
+# which are read-only hosts, and never through a VPN or proxy to get around the list.
+# BALLAST_ELIGIBLE_HOST=1 in the env file is the operator's attestation of this; the keeper
+# refuses to load Strike keys without it.
+#
+# DRY_RUN is the default. Arming needs ALL of: DRY_RUN=false and BALLAST_ARM=1 in the env file,
+# and the `--mainnet` flag on ExecStart (see the commented line). Any half of that is refused at
+# startup. Arm only after the day-one checks and an explicit human go-ahead.
+#
+# Nothing here deploys itself. Copy by hand after review.
+
+[Unit]
+Description=Ballast keeper (signs Strike requests; eligible-jurisdiction host only)
+After=network-online.target time-sync.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/ballast
+EnvironmentFile=%h/ballast/deploy/keeper.env
+# Dry run (default):
+ExecStart=%h/ballast/node_modules/.bin/tsx apps/keeper/src/main.ts
+# Armed (only with DRY_RUN=false and BALLAST_ARM=1 in keeper.env, after the go-ahead):
+# ExecStart=%h/ballast/node_modules/.bin/tsx apps/keeper/src/main.ts --mainnet
+# SIGTERM runs the graceful shutdown: stop ticking, cancel every resting ask, wait for the
+# cancels to be confirmed, release the single-instance lock.
+KillSignal=SIGTERM
+TimeoutStopSec=30
+# A crashed keeper's lock goes stale after 15 s; restarting sooner would be refused, so wait.
+# Meanwhile the watchdog on host B cancels everything 10 s after the last heartbeat.
+Restart=on-failure
+RestartSec=20
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=%h/ballast/data
+UMask=0077
+
+[Install]
+WantedBy=default.target
