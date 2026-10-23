@@ -6,7 +6,7 @@
 
 NIGHT holders keep their coins in Lace or Eternl as cover. A deterministic, Guard-governed keeper posts covered, post-only asks from each holder's own Strike account into the empty ask side of the NIGHT-USD book. Nothing is pooled: there is no vault, and the coins never leave the holder's wallet.
 
-**Live:** https://ballast-public-production.up.railway.app · **Demo film:** [ballast-demo.mp4](https://github.com/OoJae/ballast/releases/latest) (about 2 min, narrated and captioned) · **Brand:** [`/brand`](https://ballast-public-production.up.railway.app/brand).
+**Live:** https://ballast-public-production.up.railway.app · **Demo film:** [YouTube](https://youtu.be/4c97Zk4PjbI) or [ballast-demo.mp4](https://github.com/OoJae/ballast/releases/latest) (about 2 min, narrated and captioned) · **Brand:** [`/brand`](https://ballast-public-production.up.railway.app/brand).
 
 **For judges, no wallet needed:**
 1. **The landing page.** The hull heels 14.9° from NIGHT-USD's replayed book. Drag the what-if slider to see how much covered depth would level it.
