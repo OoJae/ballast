@@ -93,11 +93,24 @@ _(started 2026-10-23; the segment manifest and hourly roots live in `data/record
 - Stand-downs over the recorded window: 152 requotes found no non-Ballast ask (NIGHT's ask side was empty), and 121 had a fragile long under P2-blind mode.
 - **Exit criterion not yet met:** M3 asks for a 7-day replay, and only 3.5 h are recorded so far.
 
+## D10 re-run with cover (2026-10-23 13:36–13:46 UTC, read-only Koios, 10 min)
+
+Verdict: **PASS** (the live mempool test is still skipped; see below).
+- Evidence: `data/dayone/d10-live-20261023T134627Z.json`.
+- Subject: holder #0's stake key, now holding cover.
+
+| Check                   | Result                                                                                                                                                                                                                  |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cover at the tip        | **1,284.901844 NIGHT** of pinned NIGHT (policy `0691b2fe…`, asset `4e49474854`), matching the wallet.                                                                                                                    |
+| Single binding enforced | **pass.** A second account on the same stake key was refused both in memory and by the evidence DB's UNIQUE(stake_cred).                                                                                                |
+| Latency measured        | **pass.** 113 polls; 28 blocks observed (interval p50 20 s, max 46 s); Koios read latency p50 1.7 s, max 12.3 s, inside the 60 s staleness rule. Two reads were refused because the tip moved during 4 consistent re-reads. |
+| Mempool spend → r = 0   | **matcher pass, live test skipped.** The spend matcher, run on the live proof, sets r = 0 for a spend of a counted UTxO. No Ogmios endpoint is set, so a real pending spend was not observed.                          |
+
 ## D10: cover oracle, live (2026-10-23, read-only Koios, 10 min)
 
-Verdict: **FAIL, for missing prerequisites; to re-run.**
+Verdict: **FAIL, for missing prerequisites; superseded by the re-run above.**
 - Evidence: `data/dayone/d10-live-20261023T075425Z.json`.
-- Subject: holder #0's stake key, `stake1u8gesvq0fy6r6xcpt569yznrjcfdyux7j7ptd46f9qclz5gp23ddv`.
+- Subject: holder #0's stake key, before it held any cover.
 
 | Check                   | Result                                                                                                                                   |
 | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
