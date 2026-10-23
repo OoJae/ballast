@@ -1,4 +1,4 @@
-import { type Steps, steps } from "@ballast/core";
+import { minBigint, type Steps, steps } from "@ballast/core";
 import { committedSteps } from "./capacity.js";
 import type { BandResult } from "./keeper-bands.js";
 
@@ -50,12 +50,17 @@ export interface KeeperDecision {
 }
 
 export function keeperStep(k: KeeperInput): KeeperDecision {
-  const cover = k.mempoolSpend ? (k.mempoolSpend.coverAfterSteps ?? steps(0n)) : k.coverSteps;
+  // A pending spend can only lower capacity: a reported post-spend cover above the confirmed one
+  // is not trusted until a block confirms it.
+  const after = k.mempoolSpend?.coverAfterSteps ?? steps(0n);
+  const cover = k.mempoolSpend ? steps(minBigint(after, k.coverSteps)) : k.coverSteps;
   const capacity = committedSteps(cover, k.rBps);
   const exposure = k.shortSteps + k.restingSteps;
-  const breach = exposure > capacity || (k.unknownOrders > 0 && k.shortSteps > capacity);
+  // An order of unknown size counts as resting with at least one step (fail closed).
+  const breach = exposure + BigInt(k.unknownOrders) > capacity;
   const reasons: string[] = [];
   if (breach) reasons.push(`cover: short ${k.shortSteps} + asks ${k.restingSteps} > ${capacity}`);
+  if (k.unknownOrders > 0) reasons.push(`${k.unknownOrders} order(s) of unknown size`);
   if (k.mempoolSpend) reasons.push("cover: unconfirmed spend from the bound credential");
   for (const s of k.stale) reasons.push(`stale: ${s}`);
   if (k.margin.action !== "none") reasons.push(k.margin.reason);
@@ -67,6 +72,7 @@ export function keeperStep(k: KeeperInput): KeeperDecision {
 
   const mustCancel =
     breach ||
+    k.unknownOrders > 0 ||
     k.mempoolSpend !== null ||
     k.stale.length > 0 ||
     k.margin.action !== "none" ||

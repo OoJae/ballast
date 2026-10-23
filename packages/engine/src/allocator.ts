@@ -185,8 +185,14 @@ export function allocate(
         for (const [id, s] of shares) if (s > 0n) given.set(id, s);
         break;
       }
-      const drop = new Set(tooSmall.map((i) => i.id));
-      pool = pool.filter((i) => !drop.has(i.id));
+      // Drop only the smallest share (ties: the last id) and re-fill: the others' shares grow,
+      // so many equal small accounts still clear the minimum once a few sit out.
+      const worst = tooSmall.reduce((w, i) => {
+        const si = shares.get(i.id) ?? 0n;
+        const sw = shares.get(w.id) ?? 0n;
+        return si < sw || (si === sw && i.id > w.id) ? i : w;
+      });
+      pool = pool.filter((i) => i.id !== worst.id);
       target = minBigint(
         target,
         pool.reduce((s, i) => s + i.b, 0n),
