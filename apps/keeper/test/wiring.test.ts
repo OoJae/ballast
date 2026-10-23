@@ -22,8 +22,12 @@ beforeAll(async () => {
   report = await passReport(signed, T0);
 }, 60_000);
 
+/** An Advisor whose model never answers: present in every rig, it must change nothing. */
+const hangingAdvisor = () =>
+  new AdvisorService({ llm: { complete: () => new Promise<string>(() => {}) }, timeoutMs: 30 });
+
 function rig(over: Parameters<typeof wiringRig>[0] = {}): WiringRig {
-  const r = wiringRig({ engine: permissiveEngine(), ...over });
+  const r = wiringRig({ engine: permissiveEngine(), advisor: hangingAdvisor(), ...over });
   r.daemon.activatePolicy(signed, report);
   return r;
 }
