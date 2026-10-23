@@ -190,6 +190,9 @@ export class CoverOracle {
     const attempts = (this.opts.maxTipRetries ?? 3) + 1;
     let lastTip: KoiosTip | undefined;
     for (let i = 0; i < attempts; i++) {
+      // VERIFY: Koios serves the tip and the UTxO set from separate queries and does not say
+      // they share one snapshot. An unchanged tip hash before and after the UTxO read is the
+      // consistency proxy used here; D10 should measure how often the UTxO view lags the tip.
       const before = await this.koios.tip();
       const utxos =
         subject.kind === "stake"

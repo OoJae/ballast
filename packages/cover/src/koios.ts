@@ -209,6 +209,9 @@ export class KoiosClient implements KoiosReader {
     endpoint: KoiosEndpoint,
     body: Record<string, unknown>,
   ): Promise<KoiosUtxo[]> {
+    // VERIFY: the Koios spec documents offset/limit paging for "any endpoint" (PostgREST), but
+    // paging a POST RPC such as account_utxos past 1000 rows has not been exercised live; the
+    // wallets checked so far had fewer than 1000 UTxOs. Pages are not a consistent snapshot.
     const limit = this.opts.pageSize ?? 1000;
     const maxPages = this.opts.maxPages ?? 200;
     const out: KoiosUtxo[] = [];

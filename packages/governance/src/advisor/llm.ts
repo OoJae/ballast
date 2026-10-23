@@ -29,6 +29,8 @@ export function createAnthropicLlm(opts: AnthropicLlmOptions): LlmClient {
   });
   return {
     async complete(req): Promise<string> {
+      // VERIFY: request shape from the claude-api skill and @anthropic-ai/sdk 1.1.0 types; not
+      // yet exercised against the live API (no key in M4, and tests use a fake client).
       const response = await client.beta.messages.create(
         {
           model: opts.model,
