@@ -152,4 +152,54 @@ What changed because of D1:
 | partial replace-batch reject            | 34    | 0.15    | $2.94                 |
 - **Decision 1** in the evidence DB is the daemon-signed `policy` activation, committing to the Critic report's hash.
 - **Keeper:** running in DRY_RUN with no accounts, on mainnet public data (L3 and price sockets open, health `ok`). DRY_RUN never sends: a wiring test proves no signer method is called. The plan's 72 h DRY_RUN clock starts once holder #0's account is bound after D4.
-- **Anchor tooling:** `ballast anchor` is ready. The preprod anchor of this trail waits on faucet funds for the anchor wallet. The keeper holds the daemon lock, so the anchor runs in a short keeper stop (the plan's daily anchor becomes a keeper job).
+- **Anchor:** see the next section.
+
+**2026-10-23, "before" Book Health over every sealed hour so far** (`pnpm book-health -- --root data/recordings --from 2026-10-23T00:49:51Z --to 2026-10-23T08:00:00Z`; 7.2 h, 7,401,028 lines, 0 bad lines; 0 L3 rebuilds and 0 sequence breaks on both books).
+
+| Time-weighted, no Ballast orders     | NIGHT-USD         | ADA-USD             |
+| ------------------------------------ | ----------------- | ------------------- |
+| Spread                               | 98.8 bps          | 3.9 bps             |
+| Depth within ±0.5% of mid, bid / ask | $15,458 / **$30** | $216,158 / $127,828 |
+| $1K market buy, VWAP vs mid          | 70.6 bps          | 2.3 bps             |
+| $10K market buy, VWAP vs mid         | 93.1 bps          | 3.8 bps             |
+| Taker buys seen on L3                | 2                 | 132                 |
+- The first 1.9 h and the full 7.2 h agree to within 1 bps on every row, so the regime held all night.
+- Funding replica over the window: 5,652/5,652 rates and 4,584/4,584 (NIGHT) and 4,233/4,233 (ADA) averages reproduced exactly. Mark replica, all ticks: p99 0.68 bps (NIGHT) and 0.52 bps (ADA).
+
+## M4: first CIP-20 anchor on preprod, verified end to end (2026-10-23)
+
+Verdict: **M4 exit met.** The preprod anchor tx exists, `ballast verify` passes against the chain, and tampering fails it.
+- **Anchor wallet:** `addr_test1vq2lkdynss7s4pa23j4qejm2uts93fqgfxgwa29m09du9xq00xhpl`, funded from the preprod faucet with 1,000 tADA.
+- **Command:** `ballast anchor --network preprod --anchor-key … --daemon-key … --submit`.
+  - It ran during a short keeper stop, because the daemon lock keeps the decision chain single-writer.
+  - The keeper resumed at decision 2.
+- **Record:** root `d6ca25c455d349b100d3ee72bc0fed235b2e30f05bbf5027e8919547c5f2af18`.
+  - Commits to decisions 1–1 and recorder A's 45 sealed segments from hours 00–07 UTC.
+  - Decision 2 is the daemon-signed `anchor` decision over the record.
+- **Transaction:** [`7d8a1cddf6fe4e9e0eeee0b5b3ae533c337bd3d19bb79d386edee0eacfe7723c`](https://preprod.cexplorer.io/tx/7d8a1cddf6fe4e9e0eeee0b5b3ae533c337bd3d19bb79d386edee0eacfe7723c) on preprod.
+  - Fee 0.170209 tADA.
+  - Label 674 `msg`: `["d6ca25c4…c5f2af18", "seq 1-1", "segments 45"]`, read back from Koios `tx_metadata`.
+- **Verify** (anyone can run it from the repo):
+
+```sh
+pnpm ballast verify --bundle docs/evidence/bundles/preprod-m4 \
+  --operator-pubkey c5908355edd70356e4b57705f22cab1033a4a2c85e870e3bda4dcf0008a3b90e \
+  --daemon-pubkey 4eccaf39d81d47ba284bfbc7f292f5b4a5591b1fcf5457b954fe3502a9d3c7cf \
+  --recordings docs/evidence/recorder-a
+```
+
+The result is `VERIFY PASS`, with every implemented check passing:
+- bundle file hashes;
+- pinned keys;
+- decision hash chain and signatures;
+- policy signature;
+- Critic report;
+- invariant 2;
+- "1 anchor(s) match the chain".
+
+`docs/evidence/recorder-a/` holds recorder A's segment manifest and hourly roots (hashes only) at anchor time.
+
+| Tamper (on copies)                                                       | Result                                                                   |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
+| Decision 1's timestamp changed, bundle manifest hash recomputed to match | **FAIL**: decision hash chain and signatures                             |
+| One anchored L3 segment's hash rewritten in the recordings manifest      | **FAIL**: "segment 2026-10-23/03/l3.0.jsonl differs from the recordings" |

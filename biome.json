@@ -10,6 +10,8 @@
       "!dist",
       "!pnpm-lock.yaml",
       "!docs/research",
+      "!docs/evidence/bundles",
+      "!docs/evidence/recorder-a",
       "!packages/*/openapi/*.yaml"
     ]
   },

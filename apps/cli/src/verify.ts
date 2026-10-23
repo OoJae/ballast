@@ -399,7 +399,7 @@ export async function runVerify(opts: VerifyOptions): Promise<VerifyResult> {
     skip(
       "allocator",
       "Recomputation of the allocator's decisions",
-      "TODO M3: needs packages/engine",
+      "TODO M7: needs requote decisions from live accounts",
     ),
   );
   checks.push(

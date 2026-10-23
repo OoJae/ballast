@@ -1,0 +1,67 @@
+{
+  "v": 1,
+  "createdMs": 1792745319161,
+  "network": "preprod",
+  "trust": {
+    "operatorPubkeys": [
+      "c5908355edd70356e4b57705f22cab1033a4a2c85e870e3bda4dcf0008a3b90e"
+    ],
+    "daemonPubkeys": [
+      "4eccaf39d81d47ba284bfbc7f292f5b4a5591b1fcf5457b954fe3502a9d3c7cf"
+    ]
+  },
+  "decisions": {
+    "firstSeq": 1,
+    "lastSeq": 2
+  },
+  "files": [
+    {
+      "part": "policies",
+      "name": "policies.jsonl",
+      "sha256": "c8ae7f80d720d55c834667749bddca2946fd1b1e54a6e2621cbbd17e39ce4263",
+      "records": 1
+    },
+    {
+      "part": "criticReports",
+      "name": "critic-reports.jsonl",
+      "sha256": "23cbc3d2a0279982f7776e10285a51d7650e8d3375eac0bdc4331a34ac31fe86",
+      "records": 1
+    },
+    {
+      "part": "renewalEnvelopes",
+      "name": "renewal-envelopes.jsonl",
+      "sha256": "0aa2ad484157759615a7aaca6337b5e7e66d2ffa40e9b3d42b0d5717908dacd5",
+      "records": 1
+    },
+    {
+      "part": "renewals",
+      "name": "renewals.jsonl",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "records": 0
+    },
+    {
+      "part": "decisions",
+      "name": "decisions.jsonl",
+      "sha256": "5f6f1455964543047e12e45b3766adf97b1a648e57515081c9da773963fcee59",
+      "records": 2
+    },
+    {
+      "part": "anchors",
+      "name": "anchors.jsonl",
+      "sha256": "fb9e86a808cf3e92ff7e3ee9bea534d6c3247029bd7df9eb840a89a141de2694",
+      "records": 1
+    },
+    {
+      "part": "coverProofs",
+      "name": "cover-proofs.jsonl",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "records": 0
+    },
+    {
+      "part": "guardTrips",
+      "name": "guard-trips.jsonl",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "records": 0
+    }
+  ]
+}
