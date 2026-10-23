@@ -232,6 +232,60 @@ CREATE TABLE IF NOT EXISTS probes (
   note                  TEXT
 ) STRICT;
 
+-- Holder onboarding (M5). Private rows: none of them is part of the public bundle, because they
+-- carry wallet addresses. A consent's hash is what the keeper later chains as a 'consent' decision.
+CREATE TABLE IF NOT EXISTS holder_attestations (
+  id             INTEGER PRIMARY KEY,
+  stake_cred     TEXT NOT NULL CHECK (stake_cred GLOB 'stake1?*' OR stake_cred GLOB 'stake_test1?*'),
+  address        TEXT NOT NULL CHECK (address GLOB 'addr1?*' OR address GLOB 'addr_test1?*'),
+  kind           TEXT NOT NULL CHECK (kind IN ('geofence')),
+  statement_hash TEXT NOT NULL CHECK ${hex64("statement_hash")},
+  list_url       TEXT NOT NULL CHECK (list_url GLOB 'https://*'),
+  attested_at_ms INTEGER NOT NULL
+) STRICT;
+
+CREATE TABLE IF NOT EXISTS holder_wallets (
+  public_key    TEXT PRIMARY KEY CHECK ${hex64("public_key")},
+  account_id    TEXT NOT NULL REFERENCES accounts(account_id),
+  address       TEXT NOT NULL CHECK (address GLOB 'addr1?*' OR address GLOB 'addr_test1?*'),
+  key_path      TEXT NOT NULL,
+  status        TEXT NOT NULL CHECK (status IN ('active','revoked')),
+  created_at_ms INTEGER NOT NULL,
+  revoked_at_ms INTEGER,
+  CHECK ((status = 'revoked') = (revoked_at_ms IS NOT NULL))
+) STRICT;
+CREATE UNIQUE INDEX IF NOT EXISTS holder_wallets_one_active ON holder_wallets (account_id)
+  WHERE status = 'active';
+
+CREATE TABLE IF NOT EXISTS holder_consents (
+  hash           TEXT PRIMARY KEY CHECK ${hex64("hash")},
+  account_id     TEXT NOT NULL REFERENCES accounts(account_id),
+  stake_cred     TEXT NOT NULL,
+  r_bps          INTEGER NOT NULL CHECK (r_bps BETWEEN 0 AND 9000),
+  max_short_base TEXT NOT NULL CHECK ${digits("max_short_base")},
+  fee_share_bps  INTEGER NOT NULL CHECK (fee_share_bps BETWEEN 0 AND 100),
+  signature_hash TEXT NOT NULL CHECK ${hex64("signature_hash")},
+  signed_at_ms   INTEGER NOT NULL
+) STRICT;
+CREATE TRIGGER IF NOT EXISTS holder_consents_bound BEFORE INSERT ON holder_consents
+WHEN NOT EXISTS (SELECT 1 FROM accounts WHERE account_id = NEW.account_id AND stake_cred = NEW.stake_cred)
+BEGIN SELECT RAISE(ABORT, 'a consent must come from the stake credential bound to the account'); END;
+
+CREATE TABLE IF NOT EXISTS funding_events (
+  id            INTEGER PRIMARY KEY,
+  account_id    TEXT NOT NULL REFERENCES accounts(account_id),
+  kind          TEXT NOT NULL CHECK (kind IN ('deposit','withdrawal')),
+  request_id    TEXT NOT NULL CHECK (length(request_id) BETWEEN 1 AND 128),
+  asset         TEXT NOT NULL CHECK (asset IN ('ADA','USDM')),
+  amount_base   TEXT CHECK (amount_base IS NULL OR ${digits("amount_base")}),
+  usd_value     TEXT,
+  tx_hash       TEXT CHECK (tx_hash IS NULL OR ${hex64("tx_hash")}),
+  status        TEXT NOT NULL CHECK (status IN ('quoted','built','submitted','confirmed','failed')),
+  created_at_ms INTEGER NOT NULL,
+  updated_at_ms INTEGER NOT NULL,
+  UNIQUE (kind, request_id)
+) STRICT;
+
 -- Single-instance advisory lock (Ripcord: four daemons once ran on one database).
 CREATE TABLE IF NOT EXISTS daemon_lock (
   id             INTEGER PRIMARY KEY CHECK (id = 1),
@@ -339,6 +393,53 @@ export interface LockAcquisition {
   holderPid?: number;
   heartbeatAgeMs?: number;
   tookOverStalePid?: number;
+}
+
+export interface HolderAttestationRow {
+  stakeCred: string;
+  address: string;
+  kind: "geofence";
+  statementHash: string;
+  listUrl: string;
+  attestedAtMs: number;
+}
+
+export interface HolderWalletRow {
+  publicKey: string;
+  accountId: string;
+  address: string;
+  /** Where the sealed key file lives (never the key). */
+  keyPath: string;
+  status: "active" | "revoked";
+  createdAtMs: number;
+  revokedAtMs: number | null;
+}
+
+export interface HolderConsentRow {
+  /** sha256 of the consent message's UTF-8 bytes. */
+  hash: string;
+  accountId: string;
+  stakeCred: string;
+  rBps: number;
+  maxShortBase: string;
+  feeShareBps: number;
+  signatureHash: string;
+  signedAtMs: number;
+}
+
+export type FundingStatus = "quoted" | "built" | "submitted" | "confirmed" | "failed";
+
+export interface FundingEventRow {
+  accountId: string;
+  kind: "deposit" | "withdrawal";
+  requestId: string;
+  asset: "ADA" | "USDM";
+  amountBase: string | null;
+  usdValue: string | null;
+  txHash: string | null;
+  status: FundingStatus;
+  createdAtMs: number;
+  updatedAtMs: number;
 }
 
 export class AccountBindingError extends Error {
@@ -470,6 +571,43 @@ export function openEvidenceDb(path: string) {
        VALUES (?, ?, ?, ?, ?, ?)`,
     ),
     isProbe: db.prepare("SELECT 1 FROM probes WHERE trade_id = ?"),
+    insertAttestation: db.prepare(
+      `INSERT INTO holder_attestations (stake_cred, address, kind, statement_hash, list_url, attested_at_ms)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    ),
+    attestations: db.prepare(
+      "SELECT * FROM holder_attestations WHERE stake_cred = ? ORDER BY attested_at_ms, id",
+    ),
+    revokeWallets: db.prepare(
+      `UPDATE holder_wallets SET status = 'revoked', revoked_at_ms = ?
+       WHERE account_id = ? AND status = 'active'`,
+    ),
+    insertWallet: db.prepare(
+      `INSERT INTO holder_wallets (public_key, account_id, address, key_path, status, created_at_ms)
+       VALUES (?, ?, ?, ?, 'active', ?)`,
+    ),
+    activeWallet: db.prepare(
+      "SELECT * FROM holder_wallets WHERE account_id = ? AND status = 'active'",
+    ),
+    insertConsent: db.prepare(
+      `INSERT INTO holder_consents (hash, account_id, stake_cred, r_bps, max_short_base, fee_share_bps,
+         signature_hash, signed_at_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ),
+    setRBps: db.prepare("UPDATE accounts SET r_bps = ?, updated_at_ms = ? WHERE account_id = ?"),
+    latestConsent: db.prepare(
+      "SELECT * FROM holder_consents WHERE account_id = ? ORDER BY signed_at_ms DESC, rowid DESC LIMIT 1",
+    ),
+    upsertFunding: db.prepare(
+      `INSERT INTO funding_events (account_id, kind, request_id, asset, amount_base, usd_value, tx_hash,
+         status, created_at_ms, updated_at_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT (kind, request_id) DO UPDATE SET status = excluded.status,
+         tx_hash = COALESCE(excluded.tx_hash, tx_hash), usd_value = COALESCE(excluded.usd_value, usd_value),
+         amount_base = COALESCE(excluded.amount_base, amount_base), updated_at_ms = excluded.updated_at_ms
+       WHERE account_id = excluded.account_id`,
+    ),
+    fundingEvents: db.prepare(
+      "SELECT * FROM funding_events WHERE account_id = ? ORDER BY created_at_ms, id",
+    ),
     selectLock: db.prepare("SELECT pid, heartbeat_ms FROM daemon_lock WHERE id = 1"),
     insertLock: db.prepare(
       "INSERT INTO daemon_lock (id, pid, acquired_at_ms, heartbeat_ms) VALUES (1, ?, ?, ?)",
@@ -500,6 +638,25 @@ export function openEvidenceDb(path: string) {
       return { acquired: false, holderPid: row.pid, heartbeatAgeMs };
     },
   );
+
+  const rotateWalletTxn = db.transaction((w: Omit<HolderWalletRow, "status" | "revokedAtMs">) => {
+    st.revokeWallets.run(w.createdAtMs, w.accountId);
+    st.insertWallet.run(w.publicKey, w.accountId, w.address, w.keyPath, w.createdAtMs);
+  });
+
+  const recordConsentTxn = db.transaction((c: HolderConsentRow) => {
+    st.insertConsent.run(
+      c.hash,
+      c.accountId,
+      c.stakeCred,
+      c.rBps,
+      c.maxShortBase,
+      c.feeShareBps,
+      c.signatureHash,
+      c.signedAtMs,
+    );
+    st.setRBps.run(c.rBps, c.signedAtMs, c.accountId);
+  });
 
   const mapAccount = (r: Record<string, unknown> | undefined): AccountRow | null =>
     r
@@ -849,6 +1006,99 @@ export function openEvidenceDb(path: string) {
     /** Labeled probe fills are excluded from KPIs. */
     isProbe(tradeId: string): boolean {
       return st.isProbe.get(tradeId) !== undefined;
+    },
+
+    /** A holder's geofence attestation (no IP data: the holder's own statement only). */
+    insertAttestation(a: HolderAttestationRow): void {
+      st.insertAttestation.run(
+        a.stakeCred,
+        a.address,
+        a.kind,
+        a.statementHash,
+        a.listUrl,
+        a.attestedAtMs,
+      );
+    },
+    attestations(stakeCred: string): HolderAttestationRow[] {
+      return (st.attestations.all(stakeCred) as Record<string, unknown>[]).map((r) => ({
+        stakeCred: r.stake_cred as string,
+        address: r.address as string,
+        kind: r.kind as "geofence",
+        statementHash: r.statement_hash as string,
+        listUrl: r.list_url as string,
+        attestedAtMs: r.attested_at_ms as number,
+      }));
+    },
+
+    /** Records a new API wallet for the account, revoking the previous one in the same commit. */
+    rotateHolderWallet(w: Omit<HolderWalletRow, "status" | "revokedAtMs">): void {
+      rotateWalletTxn(w);
+    },
+    activeHolderWallet(accountId: string): HolderWalletRow | null {
+      const r = st.activeWallet.get(accountId) as Record<string, unknown> | undefined;
+      return r
+        ? {
+            publicKey: r.public_key as string,
+            accountId: r.account_id as string,
+            address: r.address as string,
+            keyPath: r.key_path as string,
+            status: r.status as "active",
+            createdAtMs: r.created_at_ms as number,
+            revokedAtMs: null,
+          }
+        : null;
+    },
+
+    /** Stores a signed consent's hash and applies its r to the account, atomically. */
+    recordConsent(c: HolderConsentRow): void {
+      recordConsentTxn(c);
+    },
+    latestConsent(accountId: string): HolderConsentRow | null {
+      const r = st.latestConsent.get(accountId) as Record<string, unknown> | undefined;
+      return r
+        ? {
+            hash: r.hash as string,
+            accountId: r.account_id as string,
+            stakeCred: r.stake_cred as string,
+            rBps: r.r_bps as number,
+            maxShortBase: r.max_short_base as string,
+            feeShareBps: r.fee_share_bps as number,
+            signatureHash: r.signature_hash as string,
+            signedAtMs: r.signed_at_ms as number,
+          }
+        : null;
+    },
+
+    /** One row per deposit or withdrawal request, advanced through its statuses. */
+    recordFunding(
+      e: Omit<FundingEventRow, "createdAtMs" | "updatedAtMs"> & { nowMs: number },
+    ): void {
+      st.upsertFunding.run(
+        e.accountId,
+        e.kind,
+        e.requestId,
+        e.asset,
+        e.amountBase,
+        e.usdValue,
+        e.txHash,
+        e.status,
+        e.nowMs,
+        e.nowMs,
+      );
+    },
+    fundingEvents(accountId: string): FundingEventRow[] {
+      return (st.fundingEvents.all(accountId) as Record<string, unknown>[]).map((r) => ({
+        accountId: r.account_id as string,
+        kind: r.kind as FundingEventRow["kind"],
+        requestId: r.request_id as string,
+        asset: r.asset as FundingEventRow["asset"],
+        amountBase: (r.amount_base as string | null) ?? null,
+        usdValue: (r.usd_value as string | null) ?? null,
+        txHash: (r.tx_hash as string | null) ?? null,
+        status: r.status as FundingStatus,
+        createdAtMs: r.created_at_ms as number,
+        updatedAtMs: r.updated_at_ms as number,
+      }));
     },
 
     acquireDaemonLock(pid: number, nowMs: number, staleMs: number): LockAcquisition {
