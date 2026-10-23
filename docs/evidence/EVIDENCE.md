@@ -79,7 +79,7 @@ _(started 2026-10-23; the segment manifest and hourly roots live in `data/record
 | 429 storm (2 min, 90%)        | 0          | 53    | 0.25    | $4.43                 |
 | partial replace-batch reject  | 0          | 34    | 0.15    | $2.94                 |
 - "Violations" sums the simulator's own cover, floor, P2, static and rate checks. They are measured independently of the Guard, which sits in the loop.
-- The verdict is PASS, with output hash `9bd7a6b4…93fa`. The same data root, policy hash and seed reproduce it exactly (a CI test).
+- The verdict is PASS, with output hash `b70888ff…ecbcc` (`windows: [{ fromMs: 0, toMs: 04:21:36.333 UTC }]`). The same data root, policy hash and seed reproduce it exactly (a CI test).
 - Recorded fills: 2 re-matched taker buys, and 25 recorded bids that opened at or over a Ballast ask (see FRICTION).
 - Stand-downs over the recorded window: 152 requotes found no non-Ballast ask (NIGHT's ask side was empty), and 121 had a fragile long under P2-blind mode.
 - **Exit criterion not yet met:** M3 asks for a 7-day replay, and only 3.5 h are recorded so far.
