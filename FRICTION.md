@@ -348,3 +348,9 @@ Dated notes on confusion, docs/API mismatches, and breakage, each with a propose
   - The price socket carries `markprice@1s` for every symbol, so about 10 s.
   - L3 on NIGHT-USD and ADA-USD carries about 55 updates a second, so about 20 s.
   - Thread `idleTimeoutMs` through `L3FeedOptions`, and set it in the keeper, the watchdog and the recorder.
+
+## 2026-10-23: Strike builder codes are case-sensitive
+
+- **What happened:** Builder Connect answered `404 builder code not found` for `ballast`. The code was registered as `Ballast`, and the app displays it with that capital B. `request-signature` with `code: "Ballast"` returned Strike's message: "Connect to Strike via builder "Ballast". This authorizes the builder to collect up to 0.1% fee on your trades."
+- **Fix (done):** `HOLDER_BUILDER_CODE` accepts mixed case and defaults to `Ballast`. D2 expects `Builder{Code:"Ballast"}` on mainnet; `BALLAST_BUILDER_CODE` overrides it for the fake.
+- **For Strike:** document that codes are case-sensitive, or match them case-insensitively, since the app shows the code capitalized.

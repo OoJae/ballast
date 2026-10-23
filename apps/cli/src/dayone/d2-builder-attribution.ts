@@ -39,7 +39,7 @@ export const PLAN: DayOnePlan = {
     "public GET /v2/order?account_id=<id>&client_order_id=<id> (no key) and the signed GET for each",
     "DELETE /v2/order/cancel-all {symbol: NIGHT-USD}; confirm both CANCELED",
   ],
-  pass: 'Public GET /v2/order?account_id&client_order_id shows Builder{Code:"ballast",FeeBps:10}',
+  pass: 'Public GET /v2/order?account_id&client_order_id shows Builder{Code:"Ballast",FeeBps:10}',
   fallback: "Test single vs batch routes; report to Strike; run fee 0 (attribution remains)",
   exposure: "two ≈ $10.5 post-only asks 4% above mark for a few seconds; no fill expected",
   options: {
@@ -115,7 +115,7 @@ export async function live(ctx: LiveContext, args: DayOneArgs) {
       publicError = err instanceof Error ? err.message : String(err);
     }
     const signed = await client.getOrder(s.market.symbol, { clientOrderId: o.client_order_id });
-    const want = { Code: "ballast", FeeBps: fee };
+    const want = { Code: process.env.BALLAST_BUILDER_CODE ?? "Ballast", FeeBps: fee };
     const pb = builderOf(pub);
     out.push({
       route,

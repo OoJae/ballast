@@ -19,8 +19,9 @@ const EnvSchema = z.object({
   HOLDER_USER_AGENT: z.string().min(3).default("ballast-holder/0.1"),
   HOLDER_BUILDER_CODE: z
     .string()
-    .regex(/^[a-z0-9_-]{1,32}$/)
-    .default("ballast"),
+    // Strike's builder codes are case-sensitive: the registered code is "Ballast" (D4, 2026-10-23).
+    .regex(/^[A-Za-z0-9_-]{1,32}$/)
+    .default("Ballast"),
   HOLDER_FEE_SHARE_BPS: z
     .string()
     .regex(/^\d+$/)

@@ -80,6 +80,8 @@ describe("M6 day-one scripts: the mainnet gate", () => {
 
 describe("M6 day-one scripts: live procedures against the fake", () => {
   it("D2 reads Builder{Code:ballast, FeeBps:10} on both routes and cleans up", async () => {
+    // The fake registers "ballast"; on mainnet the code is "Ballast" (Strike is case-sensitive).
+    process.env.BALLAST_BUILDER_CODE = "ballast";
     rig = await dayOneRig();
     nightRig(rig);
     const a = rig.account("d2");
