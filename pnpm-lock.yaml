@@ -225,6 +225,15 @@ importers:
         specifier: ^10.6.0
         version: 10.6.0
 
+  packages/ops:
+    dependencies:
+      '@ballast/core':
+        specifier: workspace:*
+        version: link:../core
+      '@ballast/governance':
+        specifier: workspace:*
+        version: link:../governance
+
   packages/sim:
     dependencies:
       '@ballast/core':

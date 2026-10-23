@@ -1,0 +1,14 @@
+{
+  "name": "@ballast/ops",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Operations for the keeper and watchdog: Telegram alerts, signed heartbeats, health endpoint, dead-man ping",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@ballast/core": "workspace:*",
+    "@ballast/governance": "workspace:*"
+  }
+}
