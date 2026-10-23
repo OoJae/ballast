@@ -89,6 +89,12 @@ importers:
       '@ballast/core':
         specifier: workspace:*
         version: link:../core
+      '@ballast/cover':
+        specifier: workspace:*
+        version: link:../cover
+      '@ballast/governance':
+        specifier: workspace:*
+        version: link:../governance
       '@emurgo/cardano-serialization-lib-nodejs':
         specifier: ^17.0.0
         version: 17.0.0
