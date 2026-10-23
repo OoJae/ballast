@@ -231,7 +231,9 @@ export function Landing() {
                 How joining works
               </Link>
             </div>
-            <p className="lp-status">Pilot · recording since 23 Oct 2026 · no orders placed yet</p>
+            <p className="lp-status">
+              Pilot · holder #0 onboarded · test orders only, no fills yet
+            </p>
           </div>
           <figure className="lp-figure">
             <HullFigure heel={heel} bid={d?.bid ?? null} ask={d?.ask ?? null} whatIf={added > 0} />
@@ -401,15 +403,16 @@ export function Landing() {
             <h3>Proof of Cover</h3>
             <p>
               short + resting asks + pending ≤ r × on-chain cover, in NIGHT, per account, before
-              every order and every block. Built and run read-only against Koios; no cover is
-              committed yet.
+              every order and every block. Holder #0's stake key holds 1,284.9 NIGHT of cover;
+              nothing quotes against it until the keeper arms.
             </p>
           </article>
           <article>
             <h3>Proof of Conduct</h3>
             <p>
-              Every order will be a <code>bal_</code> order tied to a signed policy. No orders yet;
-              the log holds two signed entries: the policy activation and the anchor.{" "}
+              Every quoting order will be a <code>bal_</code> order tied to a signed policy. So far
+              there are only labelled day-one test orders (<code>bal_d…</code>), all cancelled; the
+              keeper's log holds two signed entries: the policy activation and the anchor.{" "}
               <Link to="/conduct">Read the log</Link>.
             </p>
           </article>
@@ -434,7 +437,9 @@ export function Landing() {
         </div>
         <ul className="lp-limits">
           <li>
-            No mainnet order has been placed. Holder #0, the team's own account, quotes first.
+            No covered fill yet. Holder #0, the team's own account, is onboarded with 1,284.9 NIGHT
+            of cover; its only orders so far were day-one test asks placed 4% above the mark and
+            cancelled.
           </li>
           <li>
             The flow is thin: over the first 7.2 recorded hours, L3 showed 2 taker buys on
