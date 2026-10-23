@@ -488,6 +488,17 @@ export class HolderPresentClient {
   }
 }
 
+export {
+  type AccountLookup,
+  BuilderConnectClient,
+  type BuilderConnectOptions,
+  foreignActivity,
+  type RequestSignatureBody,
+  type RequestSignatureResponse,
+  type StrikeAccountView,
+  type VerifySignatureResponse,
+} from "./builder-connect.js";
+
 /** sha256 of the body's canonical JSON: what a holder proof's Body-SHA256 line must equal. */
 export function holderBodyHash(body: unknown): string {
   return sha256Hex(canonicalJson(body));

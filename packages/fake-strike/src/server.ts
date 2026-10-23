@@ -16,6 +16,8 @@ import {
   type MarketSpec,
   ORDER_TYPES,
 } from "./engine.js";
+import { bad, HttpError } from "./errors.js";
+import { FakeOnboarding, type OnboardingOptions } from "./onboarding.js";
 import { ed25519Verify, fmt, isRecord, parseJson, sha256, toJson } from "./util.js";
 
 export const DEFAULT_MARKETS: MarketSpec[] = [
@@ -59,6 +61,8 @@ export interface FakeStrikeOptions {
   /** Start ids past 2^53 to prove the client keeps engine ids exact. */
   firstOrderId?: bigint;
   builderCode?: string;
+  /** Builder Connect, account lookup and funding behaviour (see onboarding.ts). */
+  onboarding?: Partial<Omit<OnboardingOptions, "builderCode">>;
 }
 
 export interface AddAccountOptions {
@@ -93,19 +97,6 @@ interface SocketState {
   userAgent?: string;
 }
 
-class HttpError extends Error {
-  constructor(
-    readonly status: number,
-    readonly payload: Record<string, unknown>,
-  ) {
-    super(String(payload.error));
-  }
-}
-
-function bad(error: string, extra: Record<string, unknown> = {}): HttpError {
-  return new HttpError(400, { error, ...extra });
-}
-
 function binding(field: string, tag: string): HttpError {
   return bad(
     `Key: 'CreateOrderRequest.${field}' Error:Field validation for '${field}' failed on the '${tag}' tag`,
@@ -121,6 +112,10 @@ export class FakeStrike {
   readonly createCommands = new Map<string, number>();
   skewMs = 0;
   engineDelayMs: number;
+  /** Builder Connect, `/v2/account` and the funding routes. */
+  readonly onboarding: FakeOnboarding;
+  /** API wallets revoked by a later Builder Connect: 401 "wallet expired or revoked". */
+  readonly revokedKeys = new Set<string>();
   /** Delay applied to every user-stream message (order is preserved). */
   eventDelayMs = 0;
   /** User-stream methods the fake receives but never answers (handshake timeouts). */
@@ -146,6 +141,25 @@ export class FakeStrike {
       opts.firstOrderId ?? 33_428_500n,
     );
     for (const m of opts.markets ?? DEFAULT_MARKETS) this.engine.addMarket(m);
+    this.onboarding = new FakeOnboarding(
+      {
+        now: () => this.serverNow(),
+        createAccount: (publicKeyHex, approvedBuilderFeeBps) =>
+          this.addAccount({ publicKeyHex, accountId: randomUUID(), approvedBuilderFeeBps }),
+        registerKey: (acct, publicKeyHex) => {
+          acct.publicKeyHex = publicKeyHex;
+          this.engine.accountsByKey.set(publicKeyHex, acct);
+        },
+        revokeKey: (publicKeyHex) => {
+          this.engine.accountsByKey.delete(publicKeyHex);
+          this.revokedKeys.add(publicKeyHex);
+        },
+        keyKnown: (k) => this.engine.accountsByKey.has(k) || this.revokedKeys.has(k),
+        emit: (accountId, msg) => this.emit(accountId, msg),
+        ids: () => this.ids(),
+      },
+      { builderCode: opts.builderCode ?? "ballast", fundingAuth: "api-wallet", ...opts.onboarding },
+    );
   }
 
   serverNow(): number {
@@ -335,6 +349,7 @@ export class FakeStrike {
     const nowSec = Math.floor(now / 1000);
     const t = Number(ts);
     if (t > nowSec || nowSec - t > 180) throw deny("signature expired or invalid timestamp");
+    if (this.revokedKeys.has(pub)) throw deny("wallet expired or revoked");
     const acct = this.engine.accountsByKey.get(pub);
     const message = `${method}:${target}:${ts}:${nonce}:${sha256(body)}`;
     if (!acct || !ed25519Verify(pub, message, sig)) throw deny("authentication failed");
@@ -357,6 +372,18 @@ export class FakeStrike {
     if (method === "GET" && path === "/v2/time") return [200, { serverTime: this.serverNow() }];
     if (method === "GET" && path === "/v2/ping") return [200, {}];
 
+    const json = (): unknown => {
+      if (body.length === 0) throw bad("EOF");
+      try {
+        return parseJson(body.toString("utf8"));
+      } catch {
+        throw bad("invalid character in request body");
+      }
+    };
+    const hasWalletHeader = h["x-api-wallet-public-key"] !== undefined;
+    const open = this.onboarding.publicRoute(method, url, json, hasWalletHeader);
+    if (open) return open;
+
     const acct = this.authenticate(method, target, h, body);
     const fault = this.faults.find(
       (f) => f.times > 0 && (!f.method || f.method === method) && (!f.path || f.path === path),
@@ -370,14 +397,6 @@ export class FakeStrike {
       return [fault.status, fault.body ?? { error: defaults[fault.status] ?? "injected fault" }];
     }
 
-    const json = (): unknown => {
-      if (body.length === 0) throw bad("EOF");
-      try {
-        return parseJson(body.toString("utf8"));
-      } catch {
-        throw bad("invalid character in request body");
-      }
-    };
     const key = `${method} ${path}`;
     switch (key) {
       case "POST /v2/order":
@@ -408,7 +427,12 @@ export class FakeStrike {
       case "GET /v2/symbols":
         return [200, this.symbolSettings(acct)];
       default:
-        return [404, { error: "404 page not found" }];
+        return (
+          this.onboarding.signedRoute(acct, method, url, json) ?? [
+            404,
+            { error: "404 page not found" },
+          ]
+        );
     }
   }
 

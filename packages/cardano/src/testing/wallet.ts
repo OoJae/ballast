@@ -113,8 +113,13 @@ export class TestWallet implements Cip30Api {
     return this.network === "mainnet" ? 1 : 0;
   }
 
-  async getUtxos(): Promise<string[]> {
+  /** The wallet's UTxOs as CIP-30 hex, synchronously (what a chain indexer would also see). */
+  utxosHex(): string[] {
     return this.utxos.map((u) => bytesToHex(C.encode(utxoCbor(u, hexToBytes(this.addressHex)))));
+  }
+
+  async getUtxos(): Promise<string[]> {
+    return this.utxosHex();
   }
 
   async getUsedAddresses(): Promise<string[]> {

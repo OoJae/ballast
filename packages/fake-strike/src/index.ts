@@ -11,6 +11,12 @@ export {
   type Side,
 } from "./engine.js";
 export {
+  FAKE_USDM,
+  FakeOnboarding,
+  type FundingEvent,
+  type OnboardingOptions,
+} from "./onboarding.js";
+export {
   type AddAccountOptions,
   DEFAULT_MARKETS,
   FakeStrike,
