@@ -1,4 +1,4 @@
-import { StrikeApiError, StrikeRefusedError } from "./signed-client.js";
+import { StrikeApiError, StrikeRefusedError } from "./errors.js";
 import type { BatchOrdersResponse, StrikeOrder } from "./types.js";
 import type { OrderTradeUpdate } from "./userstream.js";
 

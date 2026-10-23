@@ -1,5 +1,5 @@
 import { isDecimalString, parseDec } from "./decimal.js";
-import { assertClientOrderId } from "./orders.js";
+import { assertClientOrderId } from "./ids.js";
 
 /**
  * Signer route allowlists (CLAUDE.md invariant 4). A request is checked here, on the exact body

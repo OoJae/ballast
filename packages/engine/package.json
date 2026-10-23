@@ -5,7 +5,9 @@
   "description": "Pure quoting engine: arm list, ladder, governor, capacity, allocator, differ, keeper",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./client-id": "./src/client-id.ts",
+    "./fingerprint": "./src/fingerprint.ts"
   },
   "dependencies": {
     "@ballast/core": "workspace:*",
