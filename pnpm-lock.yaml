@@ -118,9 +118,15 @@ importers:
       '@ballast/api':
         specifier: workspace:*
         version: link:../api
+      '@ballast/cardano':
+        specifier: workspace:*
+        version: link:../../packages/cardano
       '@ballast/evidence':
         specifier: workspace:*
         version: link:../../packages/evidence
+      '@ballast/strike-client':
+        specifier: workspace:*
+        version: link:../../packages/strike-client
       '@types/react':
         specifier: ^19.3.0
         version: 19.3.0

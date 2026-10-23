@@ -12,6 +12,8 @@ const Judge = lazy(() => import("./pages/Judge").then((m) => ({ default: m.Judge
 const Conduct = lazy(() => import("./pages/Conduct").then((m) => ({ default: m.Conduct })));
 const Policies = lazy(() => import("./pages/Policies").then((m) => ({ default: m.Policies })));
 const Makers = lazy(() => import("./pages/Makers").then((m) => ({ default: m.Makers })));
+const Join = lazy(() => import("./pages/Join").then((m) => ({ default: m.Join })));
+const Me = lazy(() => import("./pages/Me").then((m) => ({ default: m.Me })));
 
 const NAV = [
   { to: "/", label: "Book" },
@@ -20,6 +22,7 @@ const NAV = [
   { to: "/conduct", label: "Conduct" },
   { to: "/policies", label: "Policies" },
   { to: "/makers", label: "Makers" },
+  { to: "/join", label: "Join" },
 ];
 
 const TITLES: Record<string, string> = {
@@ -29,6 +32,8 @@ const TITLES: Record<string, string> = {
   "/conduct": "Proof of Conduct · Ballast",
   "/policies": "Policies · Ballast",
   "/makers": "Makers · Ballast",
+  "/join": "Join · Ballast",
+  "/me": "Your account · Ballast",
 };
 
 const NEXT_THEME: Record<ThemeChoice, ThemeChoice> = {
@@ -67,6 +72,10 @@ function Page({ path }: { path: string }) {
       return <Policies />;
     case "/makers":
       return <Makers />;
+    case "/join":
+      return <Join />;
+    case "/me":
+      return <Me />;
     default:
       return (
         <div className="page-head">
@@ -106,6 +115,9 @@ export function App() {
             ))}
           </nav>
           <div className="header-actions">
+            <Link to="/me" className="icon-btn account-link">
+              Account
+            </Link>
             <ThemeButton />
             <button
               type="button"
