@@ -203,3 +203,37 @@ The result is `VERIFY PASS`, with every implemented check passing:
 | ------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
 | Decision 1's timestamp changed, bundle manifest hash recomputed to match | **FAIL**: decision hash chain and signatures                             |
 | One anchored L3 segment's hash rewritten in the recordings manifest      | **FAIL**: "segment 2026-10-23/03/l3.0.jsonl differs from the recordings" |
+
+## M5/M6 on mainnet: holder #0 onboarded, first Ballast orders on Strike (2026-10-23)
+
+**Cover:** holder #0's stake key holds **1,284.901844 NIGHT**, the pinned asset with no lookalikes, at block 14,105,269. Capacity at r = 0.5 is 642.45 NIGHT.
+
+**D4, Builder Connect (Lace): PASS.**
+- One CIP-8 signature, through `/join`, registered Ballast's API key `9e63f943…7e60` on holder #0's existing, empty Strike account under builder **"Ballast"** with a 10 bps fee cap.
+- Only the key's public half left the laptop; the private half is sealed under the host KEK.
+- Found on the way: **builder codes are case-sensitive**. `ballast` → `404 builder code not found`, while `Ballast` works (FRICTION).
+- The account existed before, so it shows 200 → 200, not 404 → 200. The fresh-wallet 404 → 200 run uses the probe wallet.
+
+**D5, in-app ADA deposit: PASS.**
+- Strike quoted 50 ADA at 0.21576 USD/ADA ($10.788). The holder's Lace signed the transaction Strike built: it paid 52 ADA to Strike's deposit address, returned the change, and cost 0.176 ADA in network fee.
+- Timeline: submitted 10:53:22 UTC; on chain at 10:54:00 UTC, block 14,105,301, tx [`284b2054…a081e7`](https://cexplorer.io/tx/284b2054fda71a2681cfd6fcf43ee59018efcd4a654242bec7c2a9cef0a081e7); credited **$10.448** by 10:57 UTC (9 confirmations).
+- Observed conversion cost: $0.34, or 3.2% of the quote.
+- This answers FRICTION's open question: Strike accepts quote, build-tx and confirm from the Builder Connect API wallet, with the holder's wallet signing.
+
+**D2, builder attribution: PASS** (evidence `data/dayone/d2-live-20261023T105839Z.json`).
+- Two $10.5 post-only NIGHT asks at 4% above mark 0.03873201:
+  - `bal_d2_…_1` via replace-batch;
+  - `bal_d2_…_2` via orders/batch.
+- Both reached OPEN. Strike's **public** `GET /v2/order` and the signed read both show `Builder{Code:"Ballast", FeeBps:10}`.
+- Both were cancelled; no fill.
+- These are Ballast's first orders on Strike mainnet.
+
+**D8, sockets and rate accounting: PASS** (evidence `data/dayone/d8-live-20261023T110049Z.json`).
+- `/ws/user-api` logons with one key from one IP: rounds of 5, 10 and 20 all went live. The 40-socket round was refused past **39 sockets**, so the keeper and the watchdog each holding a stream is far inside the cap.
+- 20 replace-batches (cancel plus one far post-only ask) at 57 ops/min were all `200`, with no 429.
+
+**D7, kill latency: PASS** (evidence `data/dayone/d7-live-20261023T110228Z.json`).
+- 100 trials. Each rested a $10.5 post-only ask 4% above mark, waited for it on the user stream and on L3, then sent a symbol-scoped `cancel-all`. Every 4th trial also fired a concurrent cancel-only cancel-all with the same key.
+- **CANCELED on the user stream: p50 285 ms, p99 814 ms.**
+- In 98 of 100 trials the order was already gone from L3 when the stream confirmed. The check is sequential, so the L3 figure (same percentiles) is an upper bound.
+- No 429, nonce or "already processed" interference from the concurrent cancels; 0 unconfirmed.

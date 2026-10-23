@@ -354,3 +354,8 @@ Dated notes on confusion, docs/API mismatches, and breakage, each with a propose
 - **What happened:** Builder Connect answered `404 builder code not found` for `ballast`. The code was registered as `Ballast`, and the app displays it with that capital B. `request-signature` with `code: "Ballast"` returned Strike's message: "Connect to Strike via builder "Ballast". This authorizes the builder to collect up to 0.1% fee on your trades."
 - **Fix (done):** `HOLDER_BUILDER_CODE` accepts mixed case and defaults to `Ballast`. D2 expects `Builder{Code:"Ballast"}` on mainnet; `BALLAST_BUILDER_CODE` overrides it for the fake.
 - **For Strike:** document that codes are case-sensitive, or match them case-insensitively, since the app shows the code capitalized.
+
+## 2026-10-23: D7 times L3 removal after the stream event, not independently
+
+- **What happened:** `d7-kill-latency.ts` waits for CANCELED on the user stream and only then polls L3. If the order has already left L3, its L3 time is stamped with the stream time. That happened in 98 of 100 trials, so the published L3 percentiles are upper bounds.
+- **Fix:** wait on both concurrently (`Promise.all`) and stamp each when it is first seen.
