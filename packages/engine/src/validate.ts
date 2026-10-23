@@ -119,6 +119,9 @@ export function validateCreate(
     add("price-band", false, "no usable mark for the price band");
   } else {
     // [ceil(mark × (1 − band)), floor(mark × (1 + band))]: both ends rounded inward.
+    // VERIFY: strike-trading gives `order_price_out_of_price_cap/floor` as "limit price too far
+    // from mark (order_limit_price_bound)" without a formula; that the reference is the mark and
+    // the band is symmetric is inferred. Ballast's ±4.5% sits inside 5% either way (FRICTION).
     const lo = refPlusBpsCeil(mark, -band);
     const hi = refPlusBpsFloor(mark, band);
     add(

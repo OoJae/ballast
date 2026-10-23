@@ -21,6 +21,7 @@ export interface ClientIdParts {
 
 export const CLIENT_ID_RE = /^bal_([0-9a-f]{6})_([0-9a-f]{6})_([123x])_([0-9a-z]{1,13})$/;
 const HEX64 = /^[0-9a-f]{64}$/;
+const BASE36 = "0123456789abcdefghijklmnopqrstuvwxyz";
 
 export function policyTag(policyHash: string): string {
   if (!HEX64.test(policyHash)) throw new TypeError("policy hash must be a lowercase sha256 hex");
@@ -53,11 +54,7 @@ export function parseClientOrderId(id: string): ClientIdParts | null {
   // Canonical base-36 only: no leading zeros, so each seq has exactly one spelling.
   if (seq36.length > 1 && seq36.startsWith("0")) return null;
   let seq = 0n;
-  for (const ch of seq36) seq = seq * 36n + BigInt(Number.parseInt(ch, 36));
-  return {
-    policy6,
-    acct6,
-    level: lvl === "x" ? "x" : (Number(lvl) as 1 | 2 | 3),
-    seq,
-  };
+  for (const ch of seq36) seq = seq * 36n + BigInt(BASE36.indexOf(ch));
+  const level: OrderLevel = lvl === "x" ? "x" : lvl === "1" ? 1 : lvl === "2" ? 2 : 3;
+  return { policy6, acct6, level, seq };
 }

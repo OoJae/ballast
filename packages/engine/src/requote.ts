@@ -1,5 +1,6 @@
 import {
   type MicroUsd,
+  minBigint,
   type QuotePolicy,
   type RefPrice,
   refPrice,
@@ -22,6 +23,8 @@ import {
   aggregateCap,
   aggregateRoom,
   exitDepthMicroUsd,
+  type ProtocolTakerInput,
+  protocolTakerRoom,
 } from "./capacity.js";
 import { clientOrderId } from "./client-id.js";
 import { type DesiredOrder, type DiffResult, diffOrders, type RestingOrder } from "./differ.js";
@@ -62,6 +65,8 @@ export interface RequoteInput {
   /** Decision sequence number: the seq36 of every client id this round creates. */
   seq: bigint;
   fingerprintModulus?: bigint;
+  /** Protocol-as-taker budget state; omitted or null when the caller tracks none. */
+  protocolTaker?: ProtocolTakerInput | null;
 }
 
 export interface AccountPlan {
@@ -83,6 +88,8 @@ export interface RequotePlan {
   allocatorInput: { accounts: AllocAccount[]; ladder: AllocLevel[]; opts: AllocOptions };
   allocation: AllocationResult;
   accounts: AccountPlan[];
+  /** Steps the protocol may still take today; null = no limit. */
+  protocolTakerRoom: Steps | null;
 }
 
 /** Orders a requote cannot cancel by id stay counted against cover (unknown counts as resting). */
@@ -136,9 +143,18 @@ export function planRequote(input: RequoteInput): RequotePlan {
 
   const creating = new Set(input.accounts.filter((a) => a.allowCreates).map((a) => a.id));
   const allocAccounts = capacities.filter((c) => creating.has(c.id)).map(allocAccount);
-  const ladder: AllocLevel[] = governor.ok
-    ? governor.ladder.map((l) => ({ level: l.level, px: l.px, qty: l.qty }))
-    : [];
+  // Anything resting may be lifted by the protocol, so total asks stay within its remaining
+  // budget (near levels first).
+  const protoRoom = input.protocolTaker
+    ? protocolTakerRoom(input.protocolTaker, BigInt(policy.sizing.protocolTakerBudgetBps))
+    : null;
+  let protoLeft: bigint | null = protoRoom;
+  const ladder: AllocLevel[] = [];
+  for (const l of governor.ok ? governor.ladder : []) {
+    const qty = protoLeft === null ? l.qty : minBigint(l.qty, protoLeft);
+    if (protoLeft !== null) protoLeft -= qty;
+    if (qty > 0n) ladder.push({ level: l.level, px: l.px, qty: steps(qty) });
+  }
   const opts: AllocOptions = {
     rate: market.rate,
     minNotional: market.ballastMinNotional,
@@ -197,5 +213,6 @@ export function planRequote(input: RequoteInput): RequotePlan {
     allocatorInput: { accounts: allocAccounts, ladder, opts },
     allocation,
     accounts,
+    protocolTakerRoom: protoRoom,
   };
 }

@@ -117,6 +117,26 @@ export function aggregateCap(policy: QuotePolicy, exitDepth: MicroUsd): MicroUsd
   return microUsd(minBigint(policyMoney(policy).aggregateMaxShort, exitDepth));
 }
 
+export interface ProtocolTakerInput {
+  /** Σ r × cover across accounts at the start of the UTC day. */
+  dayCapacitySteps: Steps;
+  /** Today's Ballast fills where the protocol (house) was the taker, from trade_id joins. */
+  filledSteps: Steps;
+  /** Strike's written opt-in waives the budget. */
+  waived: boolean;
+}
+
+/**
+ * Protocol-as-taker fill budget (plan section 5, engine): at most `budgetBps` of the day's
+ * capacity may be sold to the protocol itself, so Ballast's cover is not just inventory relief
+ * for the house. Null means no limit (waived). Never negative.
+ */
+export function protocolTakerRoom(input: ProtocolTakerInput, budgetBps: bigint): Steps | null {
+  if (input.waived) return null;
+  const budget = (input.dayCapacitySteps * budgetBps) / BPS;
+  return steps(maxBigint(0n, budget - input.filledSteps));
+}
+
 /** What the aggregate cap still allows for new asks after every account's short and locks. */
 export function aggregateRoom(cap: MicroUsd, accounts: readonly AccountCapacity[]): MicroUsd {
   let used = 0n;
