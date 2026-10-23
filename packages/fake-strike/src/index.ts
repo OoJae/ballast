@@ -10,6 +10,7 @@ export {
   ORDER_TYPES,
   type Side,
 } from "./engine.js";
+export { type FakePrice, FakePublicMarket, type L3Event } from "./public.js";
 export {
   type AddAccountOptions,
   DEFAULT_MARKETS,

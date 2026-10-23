@@ -16,12 +16,21 @@ import {
   type MarketSpec,
   ORDER_TYPES,
 } from "./engine.js";
-import { ed25519Verify, fmt, isRecord, parseJson, sha256, toJson } from "./util.js";
+import { FakePublicMarket } from "./public.js";
+import { ed25519Verify, fmt, isRecord, parseJson, sha256, toFixed, toJson } from "./util.js";
 
 export const DEFAULT_MARKETS: MarketSpec[] = [
   {
     symbol: "NIGHT-USD",
     tickSize: "0.000001",
+    stepSize: "1",
+    minSize: "1",
+    minNotional: "10",
+    maxLeverage: 10,
+  },
+  {
+    symbol: "ADA-USD",
+    tickSize: "0.00001",
     stepSize: "1",
     minSize: "1",
     minNotional: "10",
@@ -59,6 +68,10 @@ export interface FakeStrikeOptions {
   /** Start ids past 2^53 to prove the client keeps engine ids exact. */
   firstOrderId?: bigint;
   builderCode?: string;
+  /** Cadence of `markPriceUpdate` on `/ws/price` (Strike: 1 s). */
+  priceIntervalMs?: number;
+  /** How often book changes are diffed onto `/ws/l3`. */
+  l3IntervalMs?: number;
 }
 
 export interface AddAccountOptions {
@@ -115,6 +128,10 @@ function binding(field: string, tag: string): HttpError {
 /** The fake Strike API host: REST on node:http, the user stream on ws, an ephemeral port. */
 export class FakeStrike {
   readonly engine: FakeEngine;
+  /** Public market data derived from the engine book (L3, price stream, markets, positions). */
+  readonly market: FakePublicMarket;
+  /** USD wallet balance per account served by `GET /v2/balances` (default "1000"). */
+  readonly balances = new Map<string, string>();
   readonly requests: RecordedRequest[] = [];
   readonly logons: { ok: boolean; accountId?: string; reason?: string; userAgent?: string }[] = [];
   /** Create commands received per client order id, across every route. */
@@ -127,6 +144,8 @@ export class FakeStrike {
   readonly unansweredMethods = new Set<string>();
   baseUrl = "";
   wsUrl = "";
+  /** `ws://host:port`, for `/ws/l3` and `/ws/price`. */
+  wsOrigin = "";
   private eventFilter: ((accountId: string, msg: Record<string, unknown>) => boolean) | undefined;
   private readonly faults: HttpFault[] = [];
   private readonly nonces = new Map<string, number>();
@@ -137,6 +156,9 @@ export class FakeStrike {
   private seq = 70_804_200;
   private http: Server | undefined;
   private wss: WebSocketServer | undefined;
+  private wssL3: WebSocketServer | undefined;
+  private wssPrice: WebSocketServer | undefined;
+  private publicTimers: NodeJS.Timeout[] = [];
 
   constructor(private readonly opts: FakeStrikeOptions = {}) {
     this.engineDelayMs = opts.engineDelayMs ?? 5;
@@ -146,6 +168,7 @@ export class FakeStrike {
       opts.firstOrderId ?? 33_428_500n,
     );
     for (const m of opts.markets ?? DEFAULT_MARKETS) this.engine.addMarket(m);
+    this.market = new FakePublicMarket(this.engine, () => this.serverNow());
   }
 
   serverNow(): number {
@@ -155,26 +178,54 @@ export class FakeStrike {
   async start(): Promise<void> {
     this.wss = new WebSocketServer({ noServer: true });
     this.wss.on("connection", (ws, req) => this.onSocket(ws, req));
+    this.wssL3 = new WebSocketServer({ noServer: true });
+    this.wssL3.on("connection", (ws) => this.market.onL3Socket(ws));
+    this.wssPrice = new WebSocketServer({ noServer: true });
+    this.wssPrice.on("connection", (ws) => this.market.onPriceSocket(ws));
     this.http = createServer((req, res) => {
       void this.onRequest(req, res);
     });
     this.http.on("upgrade", (req, socket, head) => {
-      if (new URL(req.url ?? "/", "http://x").pathname !== "/ws/user-api") {
+      const path = new URL(req.url ?? "/", "http://x").pathname;
+      const wss =
+        path === "/ws/user-api"
+          ? this.wss
+          : path === "/ws/l3"
+            ? this.wssL3
+            : path === "/ws/price"
+              ? this.wssPrice
+              : undefined;
+      if (!wss) {
         socket.destroy();
         return;
       }
-      this.wss?.handleUpgrade(req, socket, head, (ws) => this.wss?.emit("connection", ws, req));
+      wss.handleUpgrade(req, socket, head, (ws) => wss.emit("connection", ws, req));
     });
     await new Promise<void>((r) => this.http?.listen(0, "127.0.0.1", () => r()));
     const { port } = this.http.address() as AddressInfo;
     this.baseUrl = `http://127.0.0.1:${port}`;
     this.wsUrl = `ws://127.0.0.1:${port}/ws/user-api`;
+    this.wsOrigin = `ws://127.0.0.1:${port}`;
+    const l3 = setInterval(() => this.market.publishL3(), this.opts.l3IntervalMs ?? 5);
+    const price = setInterval(
+      () => this.market.publishPrices(),
+      this.opts.priceIntervalMs ?? 1_000,
+    );
+    l3.unref();
+    price.unref();
+    this.publicTimers.push(l3, price);
   }
 
   async stop(): Promise<void> {
     if (this.drainTimer) clearTimeout(this.drainTimer);
+    for (const t of this.publicTimers) clearInterval(t);
+    this.publicTimers = [];
     for (const ws of this.sockets.keys()) ws.terminate();
     this.sockets.clear();
+    for (const w of [this.wssL3, this.wssPrice]) {
+      for (const ws of w?.clients ?? []) ws.terminate();
+      await new Promise<void>((r) => (w ? w.close(() => r()) : r()));
+    }
     await new Promise<void>((r) => (this.wss ? this.wss.close(() => r()) : r()));
     this.http?.closeAllConnections();
     await new Promise<void>((r) => (this.http ? this.http.close(() => r()) : r()));
@@ -260,6 +311,7 @@ export class FakeStrike {
     this.drainTimer = setTimeout(() => {
       this.drainTimer = null;
       while (!this.held && this.queue.length > 0) this.queue.shift()?.();
+      this.market.publishL3();
     }, this.engineDelayMs);
   }
 
@@ -356,6 +408,8 @@ export class FakeStrike {
     const path = url.pathname;
     if (method === "GET" && path === "/v2/time") return [200, { serverTime: this.serverNow() }];
     if (method === "GET" && path === "/v2/ping") return [200, {}];
+    const pub = this.market.route(method, url);
+    if (pub) return pub;
 
     const acct = this.authenticate(method, target, h, body);
     const fault = this.faults.find(
@@ -407,6 +461,8 @@ export class FakeStrike {
         return this.getPositions(acct, url.searchParams.get("symbol") ?? undefined);
       case "GET /v2/symbols":
         return [200, this.symbolSettings(acct)];
+      case "GET /v2/balances":
+        return [200, this.balanceRows(acct)];
       default:
         return [404, { error: "404 page not found" }];
     }
@@ -682,6 +738,35 @@ export class FakeStrike {
         liquidation_price: "0",
       }));
     return [200, { positions, count: positions.length }];
+  }
+
+  /** `/v2/balances`: one USDT row; maintenance margin is 1.5% of position notional at entry. */
+  private balanceRows(acct: FakeAccount): Record<string, unknown>[] {
+    const wallet = toFixed(this.balances.get(acct.id) ?? "1000") ?? 0n;
+    let mm = 0n;
+    for (const p of acct.positions.values()) {
+      const abs = p.size < 0n ? -p.size : p.size;
+      mm += (abs * p.entry * 15n) / (1000n * 10n ** 18n);
+    }
+    const w = fmt(wallet);
+    return [
+      {
+        asset: "USDT",
+        walletBalance: w,
+        unrealizedPnl: "0",
+        marginBalance: w,
+        maintMargin: fmt(mm),
+        initialMargin: "0",
+        positionInitialMargin: "0",
+        openOrderInitialMargin: "0",
+        crossWalletBalance: w,
+        crossUnPnl: "0",
+        availableBalance: w,
+        maxWithdrawAmount: w,
+        marginAvailable: true,
+        updateTime: this.serverNow(),
+      },
+    ];
   }
 
   private symbolSettings(acct: FakeAccount): Record<string, unknown> {
