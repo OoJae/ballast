@@ -1401,8 +1401,11 @@ export function createDaemon(deps: KeeperDeps): KeeperDaemon {
         .gte(state.lastQuote.index.times(policy.requote.indexMoveBps));
     const heartbeat = !state.lastQuote || now - state.lastQuote.atMs >= heartbeatMs;
     let triggered = state.dirty || moved || heartbeat || lastStandDown;
+    // The trigger is consumed now; fills, cover and silent-drop outcomes during the round re-arm it.
+    if (triggered) state.dirty = false;
     const markTicks = m.tick.ceilUnits(price.mark);
     let floorChanged = false;
+    let deferred = false;
     for (const rt of accounts) {
       const books = accounts.map((a) => ({ id: a.id, book: accountBook(a, symbol, m) }));
       const seq = BigInt(log.head().seq + 1);
@@ -1435,7 +1438,8 @@ export function createDaemon(deps: KeeperDeps): KeeperDaemon {
       const ap = plan.accounts.find((a) => a.accountId === rt.id);
       if (!ap) continue;
       const myBook = books.find((b) => b.id === rt.id)?.book as AccountBook;
-      const mustClearMark = plan.governor.floor?.stale ?? true;
+      // P2-blind (until D6): L1 must clear the mark, so a resting ask below it is unsafe now.
+      const mustClearMark = true;
       const unsafe =
         !plan.governor.ok ||
         !rt.allowCreates ||
@@ -1464,13 +1468,18 @@ export function createDaemon(deps: KeeperDeps): KeeperDaemon {
         );
         if (!ok && unsafe && myBook.restingSteps > 0n)
           await sendCancelAll(rt, "requote blocked while orders are unsafe");
-      } else if (ap.diff.kind !== "none" && unsafe && myBook.restingSteps > 0n) {
-        await sendCancelAll(rt, `requote ${ap.diff.kind} while orders are unsafe`);
+      } else if (ap.diff.kind !== "none") {
+        // Throttled (2 s spacing) or waiting on an unconfirmed order: try again next tick.
+        deferred = true;
+        if (unsafe && myBook.restingSteps > 0n) {
+          await sendCancelAll(rt, `requote ${ap.diff.kind} while orders are unsafe`);
+        }
       }
     }
     if (triggered) {
       state.lastQuote = { index: price.index, atMs: now };
-      state.dirty = false;
+      // A Guard block does not re-arm (it would re-record every tick); a throttle or a wait does.
+      if (deferred) state.dirty = true;
     }
   }
 

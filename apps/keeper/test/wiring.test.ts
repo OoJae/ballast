@@ -99,6 +99,16 @@ describe("SAFETY PROOF: the keeper's signer is reached only through the Guard", 
     );
   }, 120_000);
 
+  it("a persistent block is recorded once per trigger, not once per tick", async () => {
+    const r = rig();
+    r.vault.shares = true;
+    await settledTick(r, 12);
+    const blocked = r.db.decisions().filter((x) => x.kind === "requote");
+    expect(blocked.length).toBeGreaterThan(0);
+    expect(blocked.length).toBeLessThanOrEqual(2);
+    expect(creates(r)).toBe(0);
+  });
+
   it("no policy at all: nothing is planned, nothing is sent", async () => {
     const r = wiringRig({ engine: permissiveEngine() });
     await settledTick(r, 3);
