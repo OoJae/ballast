@@ -61,11 +61,15 @@ next starts. D4, D5 and D9 are covered in their own sections.
    `HOLDER_BUILDER_CODE` defaults to `ballast`. If Builder Connect answers
    `404 builder code not found`, re-run with `HOLDER_BUILDER_CODE=Ballast`. The challenge request
    fails before anything is signed, so the retry costs nothing. Record which spelling Strike accepts.
-4. **Wallets.** In Lace, add a **fresh account** that has never been used on Strike. Send it
-   about 30 ADA: 10 for the deposit, about 2 plus fees for the withdrawal's funding transaction,
-   the rest for fees. For the USDM run of D5, also send it a few USDM. Do the same later with a
-   fresh Eternl account. Use a Shelley (`addr1…`) base address.
-5. **Amounts at risk.** At most the deposit (10 ADA, then a few USDM), the $1 withdrawal fee and
+4. **Wallets.** D4/D5 run with **holder #0**. Its Strike account exists but is empty and dedicated,
+   so it qualifies; the 404 → 200 flip is shown later by an outside holder's fresh wallet.
+   - Strike's minimum deposit is **$5**. At ADA ≈ $0.22 (2026-10-23), 10 ADA would be refused.
+   - Deposit **50 ADA** for D5 (≈ $11), plus the margin the later tests need (see the morning
+     checklist).
+   - Keep about 25 ADA in the wallet for fees and the withdrawal's ~2 ADA funding transaction.
+   - Use a Shelley (`addr1…`) base address.
+   - The Eternl run of D4 is optional and can use the D3 probe wallet.
+5. **Amounts at risk.** At most the deposit (50 ADA, then a few USDM), the $1 withdrawal fee and
    network fees.
 
 ## Setup (once)
