@@ -1,0 +1,27 @@
+{
+  "name": "@ballast/watchdog",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CANCEL_ONLY watchdog on a second host: signed heartbeats, its own L3 and Koios view, per-account cancel-all",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@ballast/core": "workspace:*",
+    "@ballast/cover": "workspace:*",
+    "@ballast/engine": "workspace:*",
+    "@ballast/evidence": "workspace:*",
+    "@ballast/governance": "workspace:*",
+    "@ballast/guard": "workspace:*",
+    "@ballast/market": "workspace:*",
+    "@ballast/ops": "workspace:*",
+    "@ballast/strike-client": "workspace:*",
+    "pino": "^10.3.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@ballast/fake-strike": "workspace:*",
+    "@ballast/keeper": "workspace:*"
+  }
+}

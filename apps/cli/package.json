@@ -10,7 +10,10 @@
     "@ballast/evidence": "workspace:*",
     "@ballast/governance": "workspace:*",
     "@ballast/market": "workspace:*",
-    "@ballast/strike-client": "workspace:*"
+    "@ballast/strike-client": "workspace:*",
+    "@ballast/ops": "workspace:*",
+    "@ballast/engine": "workspace:*",
+    "ws": "^8.22.0"
   },
   "devDependencies": {
     "@ballast/fake-strike": "workspace:*"

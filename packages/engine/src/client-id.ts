@@ -1,5 +1,5 @@
 import { sha256Hex } from "@ballast/core";
-import { assertClientOrderId } from "@ballast/strike-client";
+import { assertClientOrderId } from "@ballast/strike-client/ids";
 
 /**
  * Client order ids, `bal_<policy6>_<acct6>_<lvl|x>_<seq36>` (plan section 6, ~24 characters).

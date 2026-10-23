@@ -1,4 +1,10 @@
 export {
+  checkRiskReducing,
+  type ExemptInput,
+  guardedCancel,
+  riskReducing,
+} from "./exempt.js";
+export {
   checkGuard,
   FRESHNESS,
   guardedSend,

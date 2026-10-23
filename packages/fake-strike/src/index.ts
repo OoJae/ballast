@@ -16,6 +16,7 @@ export {
   type FundingEvent,
   type OnboardingOptions,
 } from "./onboarding.js";
+export { type FakePrice, FakePublicMarket, type L3Event } from "./public.js";
 export {
   type AddAccountOptions,
   DEFAULT_MARKETS,

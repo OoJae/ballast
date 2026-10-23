@@ -5,7 +5,12 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./funding": "./src/funding.ts"
+    "./funding": "./src/funding.ts",
+    "./cancel-only": "./src/cancel-only.ts",
+    "./decimal": "./src/decimal.ts",
+    "./ids": "./src/ids.ts",
+    "./l3": "./src/l3.ts",
+    "./routes": "./src/routes.ts"
   },
   "dependencies": {
     "@ballast/cardano": "workspace:*",

@@ -44,7 +44,8 @@ import {
   type StaticResult,
   validateCreate,
 } from "@ballast/engine";
-import { checkRoute, type RouteCheck } from "@ballast/strike-client";
+import type { RouteCheck } from "@ballast/strike-client";
+import { dryRunDetail, riskReducing, routeCheckOf } from "./exempt.js";
 import type { GuardCheck, GuardInput, GuardResult, GuardRuleId, GuardViolation } from "./types.js";
 
 /** Freshness limits (plan section 5): a breach cancels. */
@@ -147,15 +148,6 @@ function legsOf(path: string, body: unknown): Legs {
   return legs;
 }
 
-/** Cancels, cancel-all, cancel-only replace-batches and the reduce-only IOC buy-back. */
-function riskReducing(route: RouteCheck): boolean {
-  if (!route.ok) return false;
-  if (route.route === "order.cancel" || route.route === "order.cancel-all") return true;
-  if (route.route === "order.replace-batch") return route.cost.creates === 0;
-  // checkRoute admits POST /v2/order only as a reduce-only IOC buy-back.
-  return route.route === "order.exit";
-}
-
 const safeInt = (v: number, fallback: bigint): bigint =>
   Number.isSafeInteger(v) ? BigInt(v) : fallback;
 
@@ -177,12 +169,7 @@ export function checkGuard(input: GuardInput): GuardResult {
     }
   };
 
-  let route: RouteCheck;
-  try {
-    route = checkRoute(input.profile, input.request.method, input.request.path, input.request.body);
-  } catch (e) {
-    route = { ok: false, reason: `route check threw: ${errText(e)}` };
-  }
+  const route: RouteCheck = routeCheckOf(input.profile, input.request);
   const reducing = riskReducing(route);
   const routeRule = () =>
     rule("route-allowlist", () => {
@@ -197,13 +184,7 @@ export function checkGuard(input: GuardInput): GuardResult {
 
   // dry-run: evaluated LAST; it decides the outcome only when everything else passed.
   const dryRun = input.flags?.dryRun !== false;
-  const dryRunDetail =
-    violations.length > 0
-      ? `DRY_RUN=${dryRun}; moot, blocked by ${violations.length} violation(s)`
-      : dryRun
-        ? "DRY_RUN held fire: all checks passed, nothing sent"
-        : "DRY_RUN disabled: live execution authorized";
-  checks.push({ rule: "dry-run", passed: true, detail: dryRunDetail });
+  checks.push({ rule: "dry-run", passed: true, detail: dryRunDetail(violations.length, dryRun) });
 
   const decision: GuardResult["decision"] =
     violations.length > 0 ? "blocked" : dryRun ? "dry-run" : "execute";

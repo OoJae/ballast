@@ -1,4 +1,4 @@
-import { L3Book, type L3Snapshot, type L3Status, type L3Update } from "@ballast/strike-client";
+import { L3Book, type L3Snapshot, type L3Status, type L3Update } from "@ballast/strike-client/l3";
 import { type Level, type LevelBook, levelsFromL3, protectImpact } from "./book.js";
 import {
   BookHealthAggregator,

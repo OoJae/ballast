@@ -1,0 +1,42 @@
+# Ballast watchdog (host B: a different provider from the keeper's host A). systemd user unit.
+#
+# HOSTING RULE (CLAUDE.md): the watchdog holds the account's Strike key and signs cancel-alls and
+# signed reads, so it MUST run on a host that is NOT in any of Strike's restricted jurisdictions
+# (https://www.strikefinance.org/restricted). Never on Sonar-VPS2 (US) or Railway (US, NL, SG),
+# and never through a VPN or proxy. BALLAST_ELIGIBLE_HOST=1 in the env file is the operator's
+# attestation; the watchdog refuses to load keys without it.
+#
+# CANCEL_ONLY build: its module graph contains no create path (apps/watchdog/test/
+# import-graph.test.ts). DRY_RUN is the default (it logs "would cancel"); live cancels need
+# DRY_RUN=false, BALLAST_ARM=1 and `--mainnet`, exactly like the keeper.
+#
+# The heartbeat receiver binds BALLAST_HEARTBEAT_HOST:PORT; put it on the WireGuard address the
+# keeper pushes to, never on a public interface (heartbeats are signed, but nothing else needs it).
+#
+# Nothing here deploys itself. Copy by hand after review.
+
+[Unit]
+Description=Ballast watchdog (CANCEL_ONLY; eligible-jurisdiction host only)
+After=network-online.target time-sync.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/ballast
+EnvironmentFile=%h/ballast/deploy/watchdog.env
+# Dry run (default):
+ExecStart=%h/ballast/node_modules/.bin/tsx apps/watchdog/src/main.ts
+# Live cancels (only with DRY_RUN=false and BALLAST_ARM=1 in watchdog.env, after the go-ahead):
+# ExecStart=%h/ballast/node_modules/.bin/tsx apps/watchdog/src/main.ts --mainnet
+# The watchdog never cancels on its own shutdown: stopping it removes a safety net, nothing else.
+TimeoutStopSec=10
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=%h/ballast/data
+UMask=0077
+
+[Install]
+WantedBy=default.target

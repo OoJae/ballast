@@ -13,10 +13,10 @@ import {
   verifyCip8,
 } from "@ballast/cardano";
 import { ClockNotSyncedError, type ServerClock } from "./clock.js";
+import { StrikeApiError, StrikeRefusedError, StrikeTransportError } from "./errors.js";
 import { parseJsonExact, stringifyJsonExact } from "./json.js";
 import { FUNDING_ROUTES, type FundingRoute, type HolderPresentProfile } from "./routes.js";
 import { type ApiWalletSigner, sha256Hex } from "./sign.js";
-import { StrikeApiError, StrikeRefusedError, StrikeTransportError } from "./signed-client.js";
 
 /**
  * The HOLDER_PRESENT signer profile (plan §7, invariant 18): the only code in Ballast that signs

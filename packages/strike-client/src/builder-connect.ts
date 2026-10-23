@@ -1,5 +1,5 @@
+import { StrikeApiError, StrikeRefusedError, StrikeTransportError } from "./errors.js";
 import { stringifyJsonExact } from "./json.js";
-import { StrikeApiError, StrikeRefusedError, StrikeTransportError } from "./signed-client.js";
 
 /**
  * Strike's public Builder Connect (strike-auth, builder-connect.md) and the public account lookup

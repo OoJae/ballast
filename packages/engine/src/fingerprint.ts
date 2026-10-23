@@ -1,5 +1,6 @@
 import { type Steps, sha256Hex, steps } from "@ballast/core";
-import { canonicalPrice, compareDecimalStrings, type L3Order } from "@ballast/strike-client";
+import { compareDecimalStrings } from "@ballast/strike-client/decimal";
+import { canonicalPrice, type L3Order } from "@ballast/strike-client/l3";
 
 /**
  * L3 order ids are opaque, so Ballast finds its own orders on L3 by price plus a fingerprinted
