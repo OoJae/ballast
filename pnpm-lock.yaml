@@ -59,6 +59,9 @@ importers:
       '@ballast/cover':
         specifier: workspace:*
         version: link:../../packages/cover
+      '@ballast/engine':
+        specifier: workspace:*
+        version: link:../../packages/engine
       '@ballast/evidence':
         specifier: workspace:*
         version: link:../../packages/evidence
@@ -68,9 +71,19 @@ importers:
       '@ballast/market':
         specifier: workspace:*
         version: link:../../packages/market
+      '@ballast/ops':
+        specifier: workspace:*
+        version: link:../../packages/ops
       '@ballast/strike-client':
         specifier: workspace:*
         version: link:../../packages/strike-client
+      ws:
+        specifier: ^8.22.0
+        version: 8.22.0
+    devDependencies:
+      '@ballast/fake-strike':
+        specifier: workspace:*
+        version: link:../../packages/fake-strike
 
   apps/keeper:
     dependencies:

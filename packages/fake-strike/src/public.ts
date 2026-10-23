@@ -262,6 +262,23 @@ export class FakePublicMarket {
             updated_at: this.livePositions.updated_at ?? this.now(),
           },
         ];
+      case "/price/v2/premiumIndex": {
+        const symbol = q.get("symbol") ?? "";
+        const p = this.prices.get(symbol);
+        if (!p) return [200, {}];
+        const t = this.now();
+        return [
+          200,
+          {
+            symbol,
+            markPrice: p.mark,
+            indexPrice: p.index,
+            fundingRate: p.rate ?? "0.0001",
+            nextFundingTime: p.nextFundingMs ?? t - (t % 3_600_000) + 3_600_000,
+            time: t,
+          },
+        ];
+      }
       case "/v2/vault/positions": {
         const account = q.get("account_id") ?? "";
         return [

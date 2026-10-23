@@ -410,6 +410,17 @@ export class FakeStrike {
     if (method === "GET" && path === "/v2/ping") return [200, {}];
     const pub = this.market.route(method, url);
     if (pub) return pub;
+    // FlexibleAuth: any account's order by account_id, with no key (a public read).
+    if (
+      method === "GET" &&
+      path === "/v2/order" &&
+      url.searchParams.has("account_id") &&
+      h["x-api-wallet-public-key"] === undefined
+    ) {
+      const owner = this.engine.accounts.get(url.searchParams.get("account_id") ?? "");
+      if (!owner) return [404, { error: "user not found" }];
+      return this.getOrder(owner, url.searchParams);
+    }
 
     const acct = this.authenticate(method, target, h, body);
     const fault = this.faults.find(
