@@ -2,7 +2,7 @@
  * In-process fakes for the wiring tests: a static market view, a static cover, a signer spy and
  * scripted reads. No sockets, no timers, no keys that guard anything.
  */
-import { refPlusBpsCeil, refPrice, steps } from "@ballast/core";
+import { type QuotePolicy, refPlusBpsCeil, refPrice, steps } from "@ballast/core";
 import {
   clientOrderId,
   engineMarket,
@@ -13,6 +13,7 @@ import {
   type RequotePlan,
 } from "@ballast/engine";
 import { type EvidenceDb, openEvidenceDb } from "@ballast/evidence/db";
+import type { CriticRunner } from "@ballast/governance";
 import { dec } from "@ballast/market";
 import {
   L3Book,
@@ -20,6 +21,7 @@ import {
   RateLimiter,
   replaceBatch,
   StrikeApiError,
+  type StrikePosition,
 } from "@ballast/strike-client";
 import { vi } from "vitest";
 import type { AccountConfig, AccountPorts, BalanceRow } from "../src/account.js";
@@ -152,6 +154,8 @@ export interface WiringRig {
   balances: { marginBalance: string; maintMargin: string };
   stream: { live: boolean };
   vault: { shares: boolean };
+  /** What `GET /v2/positions` answers (a resync reads it). */
+  positions: StrikePosition[];
   notifier: ReturnType<typeof captureNotifier>;
   wouldPlace: unknown[];
 }
@@ -162,6 +166,7 @@ export function wiringRig(
     engine?: Partial<EnginePorts>;
     advisor?: AdvisorPort;
     trustedOperators?: string[];
+    critic?: CriticRunner<QuotePolicy> | null;
   } = {},
 ): WiringRig {
   const clock = { t: T0, now: () => clock.t };
@@ -171,6 +176,7 @@ export function wiringRig(
   const balances = { marginBalance: "1000", maintMargin: "0" };
   const stream = { live: true };
   const vault = { shares: false };
+  const positions: StrikePosition[] = [];
   const account: AccountConfig = {
     accountId: "acct-wiring",
     stakeAddress: stakeAddressFor("wiring"),
@@ -189,7 +195,7 @@ export function wiringRig(
       return { orders: [], count: 0 };
     },
     async positions() {
-      return { positions: [], count: 0 };
+      return { positions: [...positions], count: positions.length };
     },
     async getOrder() {
       throw new StrikeApiError(404, "order not found", "", "GET", "/v2/order");
@@ -237,6 +243,7 @@ export function wiringRig(
     wouldPlace: (e) => wouldPlace.push(e),
     ...(opts.engine ? { engine: opts.engine } : {}),
     ...(opts.advisor ? { advisor: opts.advisor } : {}),
+    ...(opts.critic !== undefined ? { critic: opts.critic } : {}),
     pid: 1,
   });
   return {
@@ -251,6 +258,7 @@ export function wiringRig(
     balances,
     stream,
     vault,
+    positions,
     notifier,
     wouldPlace,
   };
