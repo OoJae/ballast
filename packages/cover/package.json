@@ -5,7 +5,8 @@
   "description": "Read-only Cardano cover oracle: pinned NIGHT per stake credential at a block height",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./bech32": "./src/bech32.ts"
   },
   "dependencies": {
     "@ballast/core": "workspace:*",

@@ -121,6 +121,22 @@ importers:
         specifier: 8.3.5
         version: 8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(tsx@4.23.15)
 
+  packages/cardano:
+    dependencies:
+      '@ballast/cover':
+        specifier: workspace:*
+        version: link:../cover
+      '@emurgo/cardano-message-signing-nodejs':
+        specifier: 1.1.0
+        version: 1.1.0
+      '@emurgo/cardano-serialization-lib-nodejs':
+        specifier: ^17.0.0
+        version: 17.0.0
+    devDependencies:
+      '@ballast/core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/core:
     dependencies:
       zod:
@@ -339,6 +355,9 @@ packages:
     engines: {node: '>=14.21.3'}
     cpu: [x64]
     os: [win32]
+
+  '@emurgo/cardano-message-signing-nodejs@1.1.0':
+    resolution: {integrity: sha512-PQRc8K8wZshEdmQenNUzVtiI8oJNF/1uAnBhidee5C4o1l2mDLOW+ur46HWHIFKQ6x8mSJTllcjMscHgzju0gQ==}
 
   '@emurgo/cardano-serialization-lib-nodejs@17.0.0':
     resolution: {integrity: sha512-OXayQwnQXhvgEbKSNKuQCpCTrg9LvFDbr+vHPnO/9tVrRhx/Bts+g+9d6TiI15/vAeJ0NkA3tuuiJpPTS5kD6w==}
@@ -1250,6 +1269,8 @@ snapshots:
 
   '@biomejs/cli-win32-x64@2.6.2':
     optional: true
+
+  '@emurgo/cardano-message-signing-nodejs@1.1.0': {}
 
   '@emurgo/cardano-serialization-lib-nodejs@17.0.0': {}
 

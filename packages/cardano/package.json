@@ -1,0 +1,21 @@
+{
+  "name": "@ballast/cardano",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CIP-30 wallet plumbing, CIP-8 verification, holder messages and witness merges for onboarding",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./cip30": "./src/cip30.ts",
+    "./messages": "./src/messages.ts",
+    "./testing": "./src/testing/index.ts"
+  },
+  "dependencies": {
+    "@ballast/cover": "workspace:*",
+    "@emurgo/cardano-message-signing-nodejs": "1.1.0",
+    "@emurgo/cardano-serialization-lib-nodejs": "^17.0.0"
+  },
+  "devDependencies": {
+    "@ballast/core": "workspace:*"
+  }
+}
