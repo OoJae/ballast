@@ -9,7 +9,8 @@
       "!coverage",
       "!dist",
       "!pnpm-lock.yaml",
-      "!docs/research"
+      "!docs/research",
+      "!packages/*/openapi/*.yaml"
     ]
   },
   "formatter": {

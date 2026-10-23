@@ -25,6 +25,13 @@ export interface ReconnectingSocketOptions {
    * drops clients that miss its 60 s pong deadline, so silence past ~75 s means a dead socket.
    */
   idleTimeoutMs?: number;
+  /** JSON parser for inbound lines; the user stream passes one that keeps int64 ids exact. */
+  parse?: (text: string) => unknown;
+  /**
+   * Reset the reconnect backoff only via markHealthy(), not on the first message: an error
+   * frame (a failed logon) is a message too, and must not make reconnects fast again.
+   */
+  manualBackoffReset?: boolean;
 }
 
 const MAX_CLIENT_MESSAGE_BYTES = 4096;
@@ -75,6 +82,18 @@ export class ReconnectingSocket {
     return true;
   }
 
+  /** Kill the current connection (it reconnects with backoff), e.g. when a logon never answers. */
+  drop(reason: string): void {
+    if (!this.ws) return;
+    this.lastError = reason;
+    this.ws.terminate();
+  }
+
+  /** The connection is doing its job: reconnects start from the shortest backoff again. */
+  markHealthy(): void {
+    this.attempt = 0;
+  }
+
   get isOpen(): boolean {
     return this.ws?.readyState === WebSocket.OPEN;
   }
@@ -110,14 +129,14 @@ export class ReconnectingSocket {
       this.touch();
       if (!receivedSinceOpen) {
         receivedSinceOpen = true;
-        this.attempt = 0;
+        if (!this.opts.manualBackoffReset) this.attempt = 0;
       }
       const text = Buffer.isBuffer(data)
         ? data.toString("utf8")
         : Array.isArray(data)
           ? Buffer.concat(data).toString("utf8")
           : Buffer.from(data).toString("utf8");
-      const { messages, errors } = parseFrame(text);
+      const { messages, errors } = parseFrame(text, this.opts.parse);
       for (const m of messages) this.opts.onMessage(m, recvMs);
       for (const e of errors) this.opts.onBadFrame?.(e, recvMs);
     });

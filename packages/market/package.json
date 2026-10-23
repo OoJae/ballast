@@ -1,0 +1,13 @@
+{
+  "name": "@ballast/market",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@ballast/strike-client": "workspace:*",
+    "decimal.js": "^10.6.0"
+  }
+}

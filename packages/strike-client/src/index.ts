@@ -1,3 +1,24 @@
+export {
+  apiTimeSource,
+  ClockNotSyncedError,
+  medianOffsetMs,
+  offsetUncertaintyMs,
+  ServerClock,
+  type ServerClockOptions,
+  type TimeSample,
+} from "./clock.js";
+export {
+  addDec,
+  cmpDec,
+  compareDecimalStrings,
+  type Dec,
+  decFromUnits,
+  decToString,
+  isDecimalString,
+  parseDec,
+  subDec,
+  ZERO,
+} from "./decimal.js";
 export { parseFrame } from "./frames.js";
 export {
   backoffMs,
@@ -6,6 +27,7 @@ export {
   type PublicHttp,
   StrikeHttpError,
 } from "./http.js";
+export { parseJsonExact, stringifyJsonExact, toOrderId } from "./json.js";
 export {
   canonicalPrice,
   isZeroSize,
@@ -18,6 +40,40 @@ export {
   type L3Update,
 } from "./l3.js";
 export {
+  assertClientOrderId,
+  type BatchOrdersBody,
+  batchOrders,
+  type CancelAllBody,
+  type CancelOrderBody,
+  ClientOrderIdFactory,
+  type CreateOrderBody,
+  cancelAll,
+  cancelOrder,
+  farToNear,
+  type LeverageBody,
+  type LimitOrderParams,
+  leverage,
+  limitOrder,
+  type MarginMode,
+  type MarginModeBody,
+  marginMode,
+  type OrderSide,
+  type OrderType,
+  RESERVED_CLIENT_ID_PREFIXES,
+  type ReplaceBatchBody,
+  type ReplaceCancelLeg,
+  type ReplaceItem,
+  reduceOnlyBuyBack,
+  replaceBatch,
+  type TimeInForce,
+} from "./orders.js";
+export {
+  type RateDecision,
+  RateLimiter,
+  type RateLimiterOptions,
+  type RateRequest,
+} from "./rate.js";
+export {
   createPublicReads,
   type DepthSnapshot,
   type LivePosition,
@@ -25,6 +81,91 @@ export {
   type PremiumIndex,
   type PublicReads,
 } from "./reads.js";
+export {
+  AccountReconciler,
+  type Exposure,
+  type ReconcilerOptions,
+  type ResyncOptions,
+  resyncAccount,
+  type Snapshot,
+  type TrackedOrder,
+  type TrackedStatus,
+} from "./reconcile.js";
+export {
+  checkRoute,
+  FUNDING_ROUTES,
+  type FundingRoute,
+  type HolderPresentProfile,
+  type ProfileName,
+  type RateClass,
+  type RouteCheck,
+  type RouteCost,
+  type RouteId,
+  SIGNED_READ_PATHS,
+  type SignerProfile,
+} from "./routes.js";
+export {
+  ApiWalletSigner,
+  EMPTY_BODY_SHA256,
+  type KeyMaterial,
+  type LogonParams,
+  logonSigningMessage,
+  publicKeyHex,
+  restSigningMessage,
+  type SignedHeaders,
+  sha256Hex,
+  verifyEd25519,
+} from "./sign.js";
+export {
+  type BuilderFeeConfig,
+  type Query,
+  SignedClient,
+  type SignedClientAlarm,
+  type SignedClientOptions,
+  StrikeApiError,
+  StrikeRefusedError,
+  StrikeTransportError,
+  type WriteOptions,
+} from "./signed-client.js";
+export {
+  type CreateOutcome,
+  type LookupResult,
+  lookupVia,
+  type OrderLookup,
+  type PendingCreate,
+  PendingCreates,
+  type PendingCreatesOptions,
+} from "./silent-drop.js";
+export type {
+  BatchOrdersResponse,
+  CancelAllResponse,
+  CancelOrderResponse,
+  CreateOrderResponse,
+  LeverageResponse,
+  MarginModeResponse,
+  OpenOrdersResponse,
+  OrderStatus,
+  PositionsResponse,
+  ReplaceBatchResponse,
+  StrikeOrder,
+  StrikePosition,
+  SymbolSettingsResponse,
+} from "./types.js";
+export {
+  classifyUserMessage,
+  type LeverageEventData,
+  type MarginEventData,
+  type OrderTradeUpdate,
+  type PositionContext,
+  type StreamBalance,
+  type StreamOrderStatus,
+  type StreamPosition,
+  UserStream,
+  type UserStreamAlarm,
+  type UserStreamEvent,
+  type UserStreamOptions,
+  type UserStreamState,
+} from "./userstream.js";
 export {
   ReconnectingSocket,
   type ReconnectingSocketOptions,

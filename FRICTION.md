@@ -9,11 +9,13 @@ Dated notes on confusion, docs/API mismatches, and breakage, each with a propose
 - **Fix:** treat L3 as available, but handle `400 unsupported or missing symbol` gracefully, and report the docs mismatch to Strike.
 
 ## 2026-10-23: `biome migrate` silently disabled every lint rule
+
 - **What happened:** Biome 2.6.2's migration rewrote `"rules": { "recommended": true }` as `"rules": { "preset": "none" }`. Lint then passed trivially.
 - **Fix:** set `"preset": "recommended"`, then prove the rules fire by linting a temporary probe file (it raised `noDebugger`, `noDoubleEquals` and `noExplicitAny`).
 - **Lesson:** after any migration, check that the linter still fails on a known violation.
 
 ## 2026-10-23: the local RTK hook rewrites `pnpm lint` and summarizes output
+
 - **What happened:** the shell hook turned `pnpm lint` into an ESLint invocation, and it summarized `biome check` as "No issues found" while 11 errors existed.
 - **Fix:** run gates as `rtk proxy pnpm test`, `rtk proxy pnpm typecheck` and `rtk proxy pnpm exec biome check .` to see raw output.
 
@@ -21,3 +23,126 @@ Dated notes on confusion, docs/API mismatches, and breakage, each with a propose
 
 - **Docs** already warn that it is a cache-fill time.
 - **Fix:** always sync REST signing clocks from `GET /v2/time`, then subtract 1 s.
+
+
+## 2026-10-23: how replace-batch operations count toward the orders/min limit is undocumented (D8)
+
+- **Docs:** 1,200 orders/min and 2,400 weight/min are advertised; replace-batch caps a request at 1,000 operations (cancels + creates, cancel-all = 1). Nothing says how a replace-batch is charged against the per-minute budget.
+- **What M1 does:** `rate.ts` charges one token per operation (cancels + creates) inside Ballast's own 300/min budget, the conservative choice. `// VERIFY: D8`.
+- **Fix:** measure in D8 (429 behaviour vs operation count), then calibrate; ask Strike for the weight table.
+
+## 2026-10-23: can `GET /v2/order` see a create that is sequenced but not yet processed?
+
+- **Docs:** a 201 means sequenced; silently dropped creates never appear and `GET /v2/order` returns 404. They do not say whether a live create is visible before the engine processes it.
+- **Risk:** if it is not, an engine slower than the 2 s lookup makes a live order look dropped.
+- **What M1 does:** never resends. One 404 is not proof: a create is declared dropped only after two consecutive 404s at least 2 s apart, and counts as resting until then. A late event for a "dropped" create raises `onLateEvent` / a `late-event` anomaly and the order counts as resting again. `// VERIFY:` in `silent-drop.ts`.
+- **Fix:** in D1, hold a create behind a slow path (or burst) and probe `GET /v2/order` within 100 ms of the 201.
+
+## 2026-10-23: is a 429 on a create proof that nothing was sequenced?
+
+- **Docs:** 400s publish nothing (binding, builder fee, reserved prefix); auth failures are middleware. The 429 path is not described.
+- **What M1 does:** `PendingCreates.onSendError` treats any 4xx as not sent; 5xx and transport errors stay pending (unknown counts as resting). `// VERIFY:` in `silent-drop.ts`.
+- **Fix:** confirm with Strike that the rate limiter runs before publishing.
+
+## 2026-10-23: fill `position_seq` / `position_id` semantics are implied, not stated
+
+- **Docs:** ACCOUNT_UPDATE position_seq is the "fill watermark"; fill updates carry `position_seq` and `position_id` too, and the example shows the same value (22) on both. `position_context` is "the position before this fill", but its `size` sign is not stated.
+- **What M1 does:** a fill counts as reflected in a held stream report only when the ids match and its seq ≤ the report's seq. A fill on an earlier position life also counts once that life's close report (pa "0", seq ≥ the fill's) precedes the held report. `position_context` is not used. If the reading is wrong, exposure over-counts (safe) until the next REST resync. `// VERIFY:` in `reconcile.ts`.
+- **Fix:** check on the first D3 fill: compare the fill's `position_seq` with the following POSITION_UPDATE and `/v2/history/position` `last_fill_seq`.
+
+## 2026-10-23: nonce-reuse error text differs between docs
+
+- **Docs:** strike-auth and trade-api.yaml say `401 request already processed`; docs.strikefinance.org/api/getting-started says `nonce already used`.
+- **What M1 does:** both strings raise the `nonce-replay` bug alarm.
+- **Fix:** report the mismatch to Strike.
+
+## 2026-10-23: getting-started says API wallets cannot deposit; strike-auth lists deposit/withdraw for API wallets
+
+- **Docs:** getting-started: "Not Allowed: Withdraw funds, deposit funds (requires JWT)". strike-auth: deposit and withdraw writes are masterOnly routes that reject only sub-account API keys.
+- **Impact:** M5's HOLDER_PRESENT profile. M1 refuses every funding route under every profile and defines HOLDER_PRESENT as a type that signs nothing.
+- **Fix:** settle it in D5/D9 before building M5.
+
+## 2026-10-23: fake-server assumptions not covered by the docs
+
+- An invalid but present `side`/`type` in a batch item is treated like a missing one (silent drop).
+- Post-only "would match" counts the caller's own family's resting orders.
+- A replace-batch with several statically invalid creates publishes only the first as rejected.
+- **Fix:** each is a `// VERIFY:` in `packages/fake-strike/src/engine.ts`; adjust after D1.
+
+## 2026-10-23: Biome 2.6 formats YAML and rewrote the pinned OpenAPI files
+
+- **What happened:** `biome check --write .` re-indented `packages/strike-client/openapi/*.yaml`; the PIN.json hash test failed at once.
+- **Fix:** excluded `packages/*/openapi/*.yaml` in `biome.json` and restored the byte-exact files from the pinned commit. Pinned third-party files need a hash test.
+
+## 2026-10-23: does Strike bind JSON keys case-insensitively?
+
+- **Docs:** bodies bind with Go/gin (the binding errors are `Key: 'CreateOrderRequest.Side' ...`) and unknown fields are ignored silently. Go's `encoding/json` matches keys case-insensitively by default, and a later key overrides an earlier one, but the docs do not say Strike keeps that default.
+- **Risk:** if it does, `{"side":"sell","Side":"buy"}` is checked as a sell but bound as a buy, and `Vault_Id` selects a vault. The M1 review found that the signer allowlist checked only exact lowercase keys.
+- **What M1 does:** `routes.ts` allows only byte-identical keys from Ballast's own subset, at every object level. It also refuses any selector key under Go's case folding (`ſ`→s, Kelvin sign→k included), any repeated query key, a `type` outside the route's set, a lowercase `time_in_force`, non-string decimals and non-boolean flags. This is safe whichever way Strike binds. `// VERIFY:` in `routes.ts`.
+- **Fix:** in D1, send a testnet create with a `Side` key and see whether it binds; report the answer to Strike either way.
+
+## 2026-10-23: a fill and its position update carry different times, and REST reads are no consistent cut
+
+- **Docs:** in strike-userstream's own example, a fill update has `T` …150 and `position_seq` 22, while the POSITION_UPDATE for the same seq has `T` …250. "T is the position update time." `ORDER_TRADE_UPDATE` and `ACCOUNT_UPDATE` "can interleave in either order". `GET /v2/positions` rows carry no seq watermark.
+- **Docs inconsistency:** strike-history's example has `last_fill_id` "36026" with `last_fill_seq` 21, but the fill update with `fill_id` "36026" carries `position_seq` 22.
+- **Risk (M1 review, major):** the first reconciler compared fill and position times with Ballast's estimate of Strike's clock. An estimate off by more than 1 s re-credited fills that were already in the snapshot (truth 10, reported 7 or 4). Comparing fill times with position times directly is no better, given the 100 ms gap above.
+- **What M1 does:** `reconcile.ts` never uses a server-clock estimate and never compares a fill time with a position time. It decides only by:
+  - like-for-like Strike data: fill `z` against a listing's `Filled`, fill `T` against that row's `EventTimestamp`, position update `T` against `update_timestamp`, and position_seq;
+  - local monotonic elapsed time: an event applied at least `lagMs` (1 s) before a REST request happened at least that long before Strike served it.
+    `resyncAccount` waits `lagMs` between openOrders answering and the positions request. A resync without that gap credits no listing baselines.
+- **Assumptions (`// VERIFY:` in `reconcile.ts`):**
+  - Strike's internal propagation (fill → order state, position state, REST read models) takes less than `lagMs`;
+  - fill `z` is cumulative including that fill, or `EventTimestamp` advances on every fill (either suffices);
+  - position update `T` and `update_timestamp` share one clock, monotone per account and symbol.
+- **Fix:**
+  - In D1, measure the fill → position update → `GET /v2/positions` delay under load, then set `lagMs` from p99.
+  - Check `z` and `EventTimestamp` on a partial fill.
+  - Ask Strike for a seq watermark on `GET /v2/positions`. Or seed resyncs from `/v2/history/position` `position_checkpoints` (`last_fill_seq`), as strike-history recommends, once its lag is known.
+
+
+## 2026-10-23: the skill's decimal.js recipe does not reproduce served values
+
+- **Docs:** strike-calculations says `Decimal.set({ precision: 19, rounding: ROUND_HALF_EVEN }) // matches govalues/decimal`.
+- **Measured:** govalues also caps the scale at 19 decimal places, so a value below 1 keeps fewer than 19 significant digits (`fundingRate` "0.0001847242572921308" has 16). The recipe reproduces 57 of 430 recorded `fundingRate` values; rounding to ≤ 19 significant digits and ≤ 19 decimals reproduces all 430.
+- **Fix:** `packages/market/src/decimal.ts` rounds that way (`strikeRound`). Ask Strike to correct the skill.
+## 2026-10-23: live-positions liquidation prices use a third precision
+
+- **Measured:** isolated `liquidation_price` rows on `/stat/v1/stats/live-positions` carry 20 decimal places: each division is rounded to 20 dp, which reproduces every recorded isolated row digit for digit (428 distinct rows in the first three hours). Cross rows carry ~36 digits. Neither is the engine's 19-digit value that `/v2/positions` documents.
+- **Fix:** compare numerically, within 1e-19 (golden test). The floor backs W′ out of the served LP, and 20 digits are ample for that.
+## 2026-10-23: unverified mark/funding parameters (VERIFY items in packages/market)
+
+- **Funding cap/floor** are not served by `/price/v2/premiumIndex` or `/v2/markets`; we use the docs' ±4% (8-hour basis). Rates from recorded averages match exactly, so the cap has not bound yet.
+- **δ = 5% and τ = 5 s** are the docs' "reference values from the configuration template, not the settings of a live deployment".
+- **P2's basis window:** the docs say "latest up to 60 samples, at most once per second". The fit on the first recorded hours prefers 60 samples ~1.5 s apart (a ~90 s span) with a 1.1 s book lag. The mid definition is confirmed as the impact mid: on NIGHT P2 ticks the impact mid errs 0.13 bps p50, the top-of-book mid 10.3 bps. `projectP2` stands down without a full, gap-free window.
+- **Book timing:** premium samples match the L3 book as of 1 s before the slot (p99 0.001 bps vs 5–6 bps at 0 s); most of the ~1% they miss match the cycle-time book (see below). Marks match the book ~1.1 s before the `markPriceUpdate` event time. Undocumented. The live `FundingReplica` enforces the documented alignment: an index from the current slot, and a book at or before it, at most 10 s earlier.
+- **Smaller gaps:** what P3 uses with neither a last trade nor a previous mark (we use 0), and whether the maker-rebate cap is rounded to quote_prec.
+- **F_prev** (the last settled hourly rate, used by P1) is not served anywhere public; it is recovered from the last complete window of premium-index polls (exact once the recorder has seen a full hour) and fitted before that.
+- **Fix:** ask Strike to confirm the live δ, τ, cap/floor, basis window and sampling rule, and to serve the settled rate. Until then `fitMarkReplica` estimates them, and Ballast stays in P2-blind mode (D6).
+## 2026-10-23: the mark stream's index is rounded; premiumIndex's is not
+
+- **Measured:** `markPriceUpdate.i` is rounded to quote_prec (8 dp); `/price/v2/premiumIndex` `indexPrice` is full precision. A premium sample rebuilt from the L3 book and the stream index therefore misses by up to (1 + premium)·½ulp/X: ≤ 0.0013 bps on NIGHT, ≤ 0.00024 bps on ADA.
+- **Corrected (review, 00:49–02:42 UTC):** that bound holds for 1,338 of 1,350 NIGHT samples and 1,337 of 1,348 ADA samples, not "all but 3". The out-of-bound ones miss by 0.17–10.8 bps, far beyond any rounding.
+- **Diagnosis:** a different index cycle in the slot does not explain them (tested against every tick in each slot). The book's age does: 20 of the 23 match within the bound when the book is taken as of the cycle's own time instead of ~1 s before the slot. That fits prices.md's "the newest eligible historical book", whose age we cannot observe. 3 ADA samples (0.93–7.4 bps) stay unexplained.
+- **Exactness, stated precisely:** rate ← average (1,353/1,353 per market) and average ← samples (1,232/1,232) are exact. Samples ← book are not exact; `validateFunding` lists every out-of-bound sample with its diagnosis.
+- **Fix:** ask Strike to publish the full-precision index on the stream, and the book timestamp each premium sample used.
+## 2026-10-23: served liquidation prices assume the current tier; the real trigger can be higher
+
+- **Docs:** margin-tiers.md: "Your tier is re-evaluated continuously as the mark price changes". The skill computes LP "with MMR, MA from the position's **current** notional tier". MM(notional) = max_i(notional·MMR_i − MA_i) is convex, so a long whose notional falls into a lower tier before the mark reaches its served LP meets maintenance margin above that LP.
+- **Measured (aggregate only):** 26 of 176 distinct NIGHT long states (1 of 388 ADA, a served "0") have a tier-consistent trigger above the served LP, by up to ~22 bps, which is more than b_liq (~11.3–11.5 bps). The pre-fix floor F (served LP × (1 + b_liq)) failed MB > MM_actual-tier at F in 1,137 of 10,000 random cases.
+- **Fix (done):** `longTriggerPrice` backs W + TU − TM out of the served LP with the tier at the row's mark and takes max_i LP_i over every tier. A served "0" is bounded by the lower tiers. F, `fragileLongs` and the P2 target all use it. A 10k-run property checks MB > MM at F with the tier in force there.
+- **VERIFY:** that the served LP's tier is the tier at the row's `mark_price` is golden-checked on every recorded isolated row; cross rows cannot be checked because the wallet balance is not served.
+- **Ask Strike:** serve a tier-consistent liquidation price, or document that the served one assumes the current tier.
+## 2026-10-23: P2 is not monotone in Ballast's size (impact-ask fallback)
+
+- **Docs:** prices.md protects each impact side, so an ask side that cannot fill the impact notional (or fills it outside 80–120% of index) falls back to the index.
+- **Found by a property test:** on a thin ask side, Ballast's ladder can make the impact ask fillable (above index). A partial fill then drops it back to the index, which lowers P2. The depth search's monotonicity assumption was false there.
+- **Fix (done):** `projectP2` also requires the projected P2 without Ballast's asks to be safe. Every partially filled state of the ladder then has P2 ≥ min(with ladder, without), which makes safety monotone in size. A 10k-run property checks random partial-fill states.
+## 2026-10-23: golden live-position rows must not be committed
+
+- **What happened:** the M2 golden test committed 181 real live-position rows (size, entry, leverage, isolated margin, liquidation price) as a fixture. That conflicts with the data policy, even though no row names an account.
+- **Fix (done):** the fixture is gone. The repo keeps public market tiers (`markets.json`) and synthetic rows checked against an independent 100-digit reference. The golden test reads the local, gitignored recordings at test time (`BALLAST_RECORDINGS`, default `data/recordings`) and skips without them.
+## 2026-10-23: bankruptcy definition differs between docs and skill
+
+- **Docs:** liquidations.md calls a profile bankrupt when base balance **or** margin balance is ≤ 0. **Skill:** only MB ≤ 0.
+- **Recorded:** an isolated NIGHT long with a negative `isolated_margin` is still open, and its served LP matches the formula.
+- **Fix:** `riskLevel` follows the skill (`// VERIFY`). Ask Strike which one is right.

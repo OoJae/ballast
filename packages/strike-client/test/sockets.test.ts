@@ -47,6 +47,38 @@ describe("ReconnectingSocket", () => {
     expect(got.slice(0, 2)).toEqual([{ n: 1 }, { n: 2 }]);
   });
 
+  it("with manualBackoffReset, an error frame does not reset the backoff; markHealthy does", async () => {
+    const url = await listen((ws) => {
+      ws.send('{"e":"error","error":{"code":401,"msg":"Authentication failed"}}');
+      setTimeout(() => ws.close(1008, "bye"), 5);
+    });
+    const attempts = async (manualBackoffReset: boolean, healthyAfter?: number) => {
+      const seen: number[] = [];
+      let opens = 0;
+      const sock = new ReconnectingSocket({
+        url,
+        userAgent: "t",
+        maxBackoffMs: 10,
+        manualBackoffReset,
+        onOpen: (s) => {
+          opens += 1;
+          if (opens === healthyAfter) s.markHealthy();
+        },
+        onMessage: () => {},
+        onStateChange: (state, info) => {
+          if (state === "connecting") seen.push(info.attempt);
+        },
+      });
+      sock.start();
+      await vi.waitFor(() => expect(seen.length).toBeGreaterThanOrEqual(4), { timeout: 3_000 });
+      sock.stop();
+      return seen.slice(0, 4);
+    };
+    expect(await attempts(false)).toEqual([0, 1, 1, 1]);
+    expect(await attempts(true)).toEqual([0, 1, 2, 3]);
+    expect(await attempts(true, 2)).toEqual([0, 1, 1, 2]);
+  });
+
   it("refuses client messages over 4 KiB", async () => {
     const url = await listen(() => {});
     const sock = new ReconnectingSocket({

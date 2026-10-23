@@ -1,0 +1,16 @@
+{
+  "repo": "https://github.com/strike-finance/strike-finance-skills",
+  "commit": "30ba679eb40538925a2cc0e2a71615812132f773",
+  "commitDate": "2026-10-20T06:58:29Z",
+  "fetched": "2026-10-23",
+  "files": {
+    "trade-api.yaml": {
+      "path": "openapi/trade-api.yaml",
+      "sha256": "f4b859228ab1e26bf3ea9a5ca4dec47caef63c87758fc0e8d7e752be4814b17e"
+    },
+    "user-api.yaml": {
+      "path": "openapi/user-api.yaml",
+      "sha256": "078c90d77f81bf88d1a81f2ebcd7bcca4b8bedb868bcd45fdf622cc92a260333"
+    }
+  }
+}

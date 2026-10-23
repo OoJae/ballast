@@ -1,0 +1,149 @@
+{
+  "source": "GET /v2/markets (public), recorded 2026-10-23 00:49 UTC: margin tiers, quote_prec and impact_notional only",
+  "markets": {
+    "NIGHT-USD": {
+      "quote_prec": 8,
+      "impact_notional": "1000",
+      "margin_tiers": [
+        {
+          "max_notional": "5000",
+          "max_leverage": 10,
+          "maintenance_margin_rate": "0.015",
+          "maintenance_amount": "0"
+        },
+        {
+          "max_notional": "10000",
+          "max_leverage": 10,
+          "maintenance_margin_rate": "0.025",
+          "maintenance_amount": "50.000"
+        },
+        {
+          "max_notional": "20000",
+          "max_leverage": 10,
+          "maintenance_margin_rate": "0.05",
+          "maintenance_amount": "300.000"
+        },
+        {
+          "max_notional": "50000",
+          "max_leverage": 10,
+          "maintenance_margin_rate": "0.05",
+          "maintenance_amount": "300.000"
+        },
+        {
+          "max_notional": "125000",
+          "max_leverage": 10,
+          "maintenance_margin_rate": "0.05",
+          "maintenance_amount": "300.000"
+        },
+        {
+          "max_notional": "250000",
+          "max_leverage": 5,
+          "maintenance_margin_rate": "0.1",
+          "maintenance_amount": "6550.000"
+        },
+        {
+          "max_notional": "500000",
+          "max_leverage": 2,
+          "maintenance_margin_rate": "0.1667",
+          "maintenance_amount": "23225.0000"
+        },
+        {
+          "max_notional": "7500000",
+          "max_leverage": 1,
+          "maintenance_margin_rate": "0.25",
+          "maintenance_amount": "64875.0000"
+        },
+        {
+          "max_notional": "10000000",
+          "max_leverage": 1,
+          "maintenance_margin_rate": "0.5",
+          "maintenance_amount": "1939875.0000"
+        }
+      ]
+    },
+    "ADA-USD": {
+      "quote_prec": 8,
+      "impact_notional": "2000",
+      "margin_tiers": [
+        {
+          "max_notional": "10000",
+          "max_leverage": 40,
+          "maintenance_margin_rate": "0.005",
+          "maintenance_amount": "0"
+        },
+        {
+          "max_notional": "25000",
+          "max_leverage": 40,
+          "maintenance_margin_rate": "0.01",
+          "maintenance_amount": "50.000"
+        },
+        {
+          "max_notional": "50000",
+          "max_leverage": 25,
+          "maintenance_margin_rate": "0.01",
+          "maintenance_amount": "50.000"
+        },
+        {
+          "max_notional": "100000",
+          "max_leverage": 20,
+          "maintenance_margin_rate": "0.015",
+          "maintenance_amount": "300.000"
+        },
+        {
+          "max_notional": "200000",
+          "max_leverage": 15,
+          "maintenance_margin_rate": "0.015",
+          "maintenance_amount": "300.000"
+        },
+        {
+          "max_notional": "250000",
+          "max_leverage": 15,
+          "maintenance_margin_rate": "0.02",
+          "maintenance_amount": "1300.000"
+        },
+        {
+          "max_notional": "1000000",
+          "max_leverage": 10,
+          "maintenance_margin_rate": "0.02",
+          "maintenance_amount": "1300.000"
+        },
+        {
+          "max_notional": "2000000",
+          "max_leverage": 5,
+          "maintenance_margin_rate": "0.025",
+          "maintenance_amount": "6300.000"
+        },
+        {
+          "max_notional": "10000000",
+          "max_leverage": 5,
+          "maintenance_margin_rate": "0.05",
+          "maintenance_amount": "56300.000"
+        },
+        {
+          "max_notional": "20000000",
+          "max_leverage": 1,
+          "maintenance_margin_rate": "0.1",
+          "maintenance_amount": "556300.000"
+        },
+        {
+          "max_notional": "25000000",
+          "max_leverage": 1,
+          "maintenance_margin_rate": "0.125",
+          "maintenance_amount": "1056300.000"
+        },
+        {
+          "max_notional": "50000000",
+          "max_leverage": 1,
+          "maintenance_margin_rate": "0.25",
+          "maintenance_amount": "4181300.000"
+        },
+        {
+          "max_notional": "100000000",
+          "max_leverage": 1,
+          "maintenance_margin_rate": "0.5",
+          "maintenance_amount": "16681300.000"
+        }
+      ]
+    }
+  }
+}

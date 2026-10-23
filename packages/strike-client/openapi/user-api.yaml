@@ -1,0 +1,1994 @@
+openapi: 3.0.3
+info:
+  title: Strike Perpetuals - User Data REST API
+  description: |
+    Read-only endpoints for account state, balances, portfolio, open positions, and trading history.
+
+    All endpoints use flexible authentication:
+
+    - Send the four `X-API-Wallet-*` headers (Ed25519 API wallet) to read your own account. An API wallet bound to a sub-account reads that sub-account.
+    - Or omit authentication and pass a public selector: `account_id` (UUID), `vault_id`, `blockchain` + `blockchain_address`, or `blockchain_address`.
+
+    Selector precedence: `account_id` > `vault_id` > `blockchain` + `blockchain_address` > `blockchain_address` > authenticated account (optionally narrowed with `sub_account_id`).
+
+    Decimal values are JSON strings; timestamps are Unix milliseconds. Errors are `{"error": "<message>"}`.
+  version: 2.2.0
+  contact:
+    name: Strike Finance
+    url: https://www.strikefinance.org
+servers:
+- url: https://api.strikefinance.org
+  description: Mainnet
+- url: https://api-v2-testnet.strikefinance.org
+  description: Testnet
+tags:
+- name: Account
+  description: Account info, balances, and portfolio
+- name: Positions
+  description: Open and closed position queries
+- name: History
+  description: Order, fill, position, funding, and transaction history
+x-tagGroups:
+- name: User Data
+  tags:
+  - Account
+  - Positions
+  - History
+security:
+- ApiWalletPublicKey: []
+  ApiWalletSignature: []
+  ApiWalletTimestamp: []
+  ApiWalletNonce: []
+- {}
+components:
+  securitySchemes:
+    ApiWalletPublicKey:
+      type: apiKey
+      in: header
+      name: X-API-Wallet-Public-Key
+      description: |
+        Ed25519 API wallet public key (64 hex characters).
+
+        Signed message: `{METHOD}:{PATH}:{TIMESTAMP}:{NONCE}:{BODY_HASH}`
+        - `PATH` is the URL path plus `?` + the raw query string when a query string is present (exactly as sent).
+        - `BODY_HASH` is the hex SHA-256 of the raw body bytes; for an empty body (all GETs here) it is
+          `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+        - `TIMESTAMP` is Unix seconds, not in the future and at most 3 minutes old.
+        - `NONCE` is 16-128 characters and single-use per key.
+    ApiWalletSignature:
+      type: apiKey
+      in: header
+      name: X-API-Wallet-Signature
+      description: Hex-encoded Ed25519 signature (128 hex characters) of the signed message.
+    ApiWalletTimestamp:
+      type: apiKey
+      in: header
+      name: X-API-Wallet-Timestamp
+      description: Unix timestamp in seconds.
+    ApiWalletNonce:
+      type: apiKey
+      in: header
+      name: X-API-Wallet-Nonce
+      description: Unique per-request value, 16-128 characters (a UUID works).
+  parameters:
+    AccountIdQuery:
+      name: account_id
+      in: query
+      required: false
+      description: Public selector. Any account ID (must be a UUID). Takes precedence over every other selector.
+      schema:
+        type: string
+        format: uuid
+    VaultIdQuery:
+      name: vault_id
+      in: query
+      required: false
+      description: Public selector. A vault ID (not the vault's `vault_...` account ID).
+      schema:
+        type: string
+    BlockchainQuery:
+      name: blockchain
+      in: query
+      required: false
+      description: Chain for `blockchain_address` (e.g. `cardano`, `ethereum`, `solana`). Without it the chain is inferred from the address.
+      schema:
+        type: string
+    BlockchainAddressQuery:
+      name: blockchain_address
+      in: query
+      required: false
+      description: Public selector. Wallet address that owns the account (max 512 bytes).
+      schema:
+        type: string
+        maxLength: 512
+    SubAccountIdQuery:
+      name: sub_account_id
+      in: query
+      required: false
+      description: Authenticated callers only. Reads an active sub-account owned by the caller (otherwise 401 with the no-selector message). Ignored when a public selector is present.
+      schema:
+        type: string
+    ScopeQuery:
+      name: scope
+      in: query
+      required: false
+      description: |
+        `all` reads the master account plus its active sub-accounts (the caller's family, or the family of a public `account_id` / `blockchain_address`). Cannot be combined with `vault_id` or `sub_account_id`. Any other value returns 400. API wallets bound to a sub-account get 403 for a private `scope=all`.
+      schema:
+        type: string
+        enum:
+        - all
+    IncludeCopiesQuery:
+      name: include_copies
+      in: query
+      required: false
+      description: |
+        `true` adds copy-trading executions (client_order_id prefix `copy:`) from the caller's other family accounts to the selected account's rows. Authenticated only; cannot be combined with `scope`, `account_id`, `blockchain_address`, or `vault_id` (accepts `sub_account_id`). Forbidden for API wallets bound to a sub-account.
+      schema:
+        type: string
+        enum:
+        - 'true'
+        - 'false'
+    SymbolQuery:
+      name: symbol
+      in: query
+      required: false
+      description: Trading pair symbol
+      schema:
+        type: string
+      example: BTC-USD
+    StartTimeQuery:
+      name: startTime
+      in: query
+      required: false
+      description: Inclusive start (Unix ms)
+      schema:
+        type: integer
+        format: int64
+    EndTimeQuery:
+      name: endTime
+      in: query
+      required: false
+      description: Inclusive end (Unix ms)
+      schema:
+        type: integer
+        format: int64
+    PositionHistoryLimitQuery:
+      name: limit
+      in: query
+      required: false
+      description: Page size. Values outside 1-200 return 400.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 50
+    PositionHistoryCursorQuery:
+      name: cursor
+      in: query
+      required: false
+      description: Opaque keyset cursor; pass `next_cursor` from the previous page.
+      schema:
+        type: string
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Human-readable error message
+      required:
+      - error
+    AggregateAccountRef:
+      type: object
+      description: One contributing account of a `scope=all` (or family) response.
+      properties:
+        account_id:
+          type: string
+        name:
+          type: string
+          example: Master Account
+        kind:
+          type: string
+          enum:
+          - master
+          - sub
+    AccountSubAccount:
+      type: object
+      properties:
+        account_id:
+          type: string
+        name:
+          type: string
+          example: Sub-account 1
+    SymbolSetting:
+      type: object
+      properties:
+        margin_mode:
+          type: string
+          enum:
+          - cross
+          - isolated
+        leverage:
+          type: integer
+          example: 10
+        allow_pre_trade:
+          type: boolean
+    GetAccountResponse:
+      type: object
+      properties:
+        account_id:
+          type: string
+          description: Account ID (UUID; vault trading accounts look like `vault_xxxxxxxx`)
+          example: 01a144dc-27e4-706c-ac46-9c2c1e77d60b
+        name:
+          type: string
+          description: Sub-account display name (sub-accounts only)
+        parent_account_id:
+          type: string
+          description: Master account ID (sub-accounts only)
+        parent_blockchain_address:
+          type: string
+          description: Master account wallet address (sub-accounts only)
+        blockchain:
+          type: string
+          description: Chain of the owning wallet; empty for vaults and sub-accounts
+          example: cardano
+        blockchain_address:
+          type: string
+          nullable: true
+          description: Owning wallet address; empty string for vaults, null for sub-accounts
+        nickname:
+          type: string
+        avatar_url:
+          type: string
+        wallet_balance:
+          type: string
+          description: Wallet balance (USD)
+          example: '10000'
+        available_balance:
+          type: string
+          description: |
+            Balance available for new orders: wallet - open-order margin - isolated balances - cross initial margin + cross unrealized PnL, minus copy-trading holds. Can be negative when the account has no copy holds.
+          example: '7500'
+        copy_reserved_balance:
+          type: string
+          example: '0'
+        copy_deployed_margin:
+          type: string
+          example: '0'
+        copy_profit_share_reserved:
+          type: string
+          example: '0'
+        unrealized_pnl:
+          type: string
+          description: Sum of unrealized PnL of all positions (cross and isolated)
+          example: '250.5'
+        margin_balance:
+          type: string
+          description: Cross margin balance = wallet - sum(isolated balances) + sum(cross unrealized PnL)
+          example: '10250.5'
+        total_margin:
+          type: string
+          description: Legacy sum position_initial_margin + maintenance_margin
+          example: '2500'
+        position_initial_margin:
+          type: string
+          description: Sum of position initial margin (mark notional / leverage)
+          example: '2000'
+        maintenance_margin:
+          type: string
+          description: Sum of position maintenance margin
+          example: '500'
+        sub_accounts:
+          type: array
+          description: Active sub-accounts of the master; for a sub-account, all active sub-accounts of its parent (including itself); empty for vaults
+          items:
+            $ref: '#/components/schemas/AccountSubAccount'
+        default_margin_mode:
+          type: string
+          enum:
+          - cross
+          - isolated
+        default_leverage:
+          type: integer
+          example: 10
+        symbol_settings:
+          type: object
+          description: Per-symbol settings (omitted when none)
+          additionalProperties:
+            $ref: '#/components/schemas/SymbolSetting'
+        inventory_costs_usd:
+          type: object
+          description: Vault queries only
+          additionalProperties:
+            type: string
+        custody_balances:
+          type: object
+          description: Vault queries only
+          additionalProperties:
+            type: string
+        conversion_reserved_usd:
+          type: string
+          description: Vault queries only
+        slp_adl:
+          type: object
+          nullable: true
+          description: Vault queries only; ADL profile view (may be null)
+        accounts:
+          type: array
+          description: '`scope=all` only (balances are summed across these accounts)'
+          items:
+            $ref: '#/components/schemas/AggregateAccountRef'
+    BalanceResponse:
+      type: object
+      properties:
+        asset:
+          type: string
+          example: USDT
+        walletBalance:
+          type: string
+          example: '10000'
+        unrealizedPnl:
+          type: string
+          description: Sum of unrealized PnL of all positions
+          example: '250.5'
+        marginBalance:
+          type: string
+          description: Cross margin balance (same as `margin_balance` on /v2/account)
+          example: '10250.5'
+        maintMargin:
+          type: string
+          description: Sum of position maintenance margin
+          example: '500'
+        initialMargin:
+          type: string
+          description: Legacy sum positionInitialMargin + maintMargin (same as `total_margin`)
+          example: '2500'
+        positionInitialMargin:
+          type: string
+          example: '2000'
+        openOrderInitialMargin:
+          type: string
+          description: Always "0"; open-order margin is already deducted from availableBalance
+          example: '0'
+        crossWalletBalance:
+          type: string
+          description: Equal to walletBalance (isolated balances are not subtracted)
+          example: '10000'
+        crossUnPnl:
+          type: string
+          description: Equal to unrealizedPnl (includes isolated positions)
+          example: '250.5'
+        availableBalance:
+          type: string
+          description: Same as `available_balance` on /v2/account
+          example: '7500'
+        maxWithdrawAmount:
+          type: string
+          description: |
+            Engine withdrawal cap: max(0, wallet - open-order margin - isolated balances - max(cross IM - cross uPnL, cross MM)), capped at wallet - lockedRewards when rewards are locked, minus copy-trading holds, floored at 0.
+          example: '7000'
+        marginAvailable:
+          type: boolean
+          description: Always true
+        updateTime:
+          type: integer
+          format: int64
+          description: Response time (Unix ms)
+        lockedRewards:
+          type: string
+          example: '0'
+        maxWithdrawAfterRewards:
+          type: string
+          description: Same value as maxWithdrawAmount
+          example: '7000'
+        stakingRewardBalance:
+          type: string
+          description: Segregated staking reward bucket (display only; never part of available or withdrawable)
+          example: '0'
+    PortfolioAccountSummary:
+      type: object
+      properties:
+        realized_pnl:
+          type: string
+          description: All-time realized trading PnL net of trading fees (excludes funding)
+        all_time_volume:
+          type: string
+        all_time_maker_rebates:
+          type: string
+        all_time_funding_fees:
+          type: string
+          description: Signed cumulative funding (positive = received)
+    PortfolioCapitalFlows:
+      type: object
+      properties:
+        all_time_deposits:
+          type: string
+        all_time_withdrawals:
+          type: string
+        all_time_vault_deposits:
+          type: string
+        all_time_vault_withdrawals:
+          type: string
+        all_time_credit_vault_deposits:
+          type: string
+        all_time_credit_vault_withdrawals:
+          type: string
+        all_time_transfer_in:
+          type: string
+          description: Internal master/sub transfers in
+        all_time_transfer_out:
+          type: string
+        all_time_reward_grants:
+          type: string
+    PortfolioSubAccount:
+      type: object
+      properties:
+        account_id:
+          type: string
+        parent_account_id:
+          type: string
+        name:
+          type: string
+        archived:
+          type: boolean
+          description: Display-only hide flag
+    FeeTier:
+      type: object
+      description: Fee bracket. Keys are PascalCase and values are JSON numbers.
+      properties:
+        Tier:
+          type: integer
+          example: 0
+        MinVolume:
+          type: number
+          description: Minimum pooled 30-day volume (USD)
+          example: 0
+        TakerRate:
+          type: number
+          example: 0.0005
+        MakerRate:
+          type: number
+          example: 0
+    MakerRebateTier:
+      type: object
+      properties:
+        tier:
+          type: integer
+        minMakerVolumeShare:
+          type: number
+          description: Strict lower bound on share of exchange maker volume
+        makerRate:
+          type: number
+          description: Negative = rebate
+    StakingFeeDiscountTier:
+      type: object
+      properties:
+        tier:
+          type: integer
+        minStakedStrike:
+          type: number
+        discountRate:
+          type: number
+    VolumeHistoryEntry:
+      type: object
+      properties:
+        date:
+          type: string
+          description: YYYY-MM-DD
+          example: '2026-10-18'
+        exchange_volume:
+          type: string
+          description: Exchange-wide volume for the day
+        weighted_maker_volume:
+          type: string
+          description: This account's maker volume
+        weighted_taker_volume:
+          type: string
+          description: This account's taker volume
+    PortfolioSummaryResponse:
+      type: object
+      properties:
+        account:
+          $ref: '#/components/schemas/PortfolioAccountSummary'
+        perp_account:
+          $ref: '#/components/schemas/PortfolioAccountSummary'
+        capital_flows:
+          $ref: '#/components/schemas/PortfolioCapitalFlows'
+        sub_accounts:
+          type: array
+          items:
+            $ref: '#/components/schemas/PortfolioSubAccount'
+        volume:
+          type: string
+          description: All-time trading volume
+        fees:
+          type: string
+          description: All-time trading fees + all-time funding fees
+        all_time_maker_rebates:
+          type: string
+        all_time_funding_fees:
+          type: string
+        fee_tier_volume_30d:
+          type: string
+          description: Pooled master + active sub-account 30-day volume (maker + taker)
+        fee_tier_maker_volume_30d:
+          type: string
+        fee_tier_taker_volume_30d:
+          type: string
+        history_perp_only:
+          type: array
+          description: |
+            Ascending points `[timestamp_ms (integer), accountValue, realizedPnl, unrealizedPnl, volume]` (values are strings). Hourly buckets for the last 30 days, daily before that.
+          items:
+            type: array
+            items:
+              oneOf:
+              - type: integer
+              - type: string
+          example:
+          - - 1792159200000
+            - '10000'
+            - '0'
+            - '0'
+            - '0'
+        history_vault:
+          type: array
+          description: Ascending points `[timestamp_ms (integer), vault_value, vault_total_pnl]`.
+          items:
+            type: array
+            items:
+              oneOf:
+              - type: integer
+              - type: string
+          example:
+          - - 1792159200000
+            - '0'
+            - '0'
+        fee_tier:
+          type: integer
+          description: Effective fee tier
+        fee_tiers:
+          type: array
+          items:
+            $ref: '#/components/schemas/FeeTier'
+        maker_rebate_tiers:
+          type: array
+          items:
+            $ref: '#/components/schemas/MakerRebateTier'
+        staking_fee_discount_tiers:
+          type: array
+          nullable: true
+          items:
+            $ref: '#/components/schemas/StakingFeeDiscountTier'
+        maker_fee_rate_override:
+          type: string
+          nullable: true
+          description: Account maker fee override (negative = rebate); null when none
+        staking_fee_discount_staked_strike:
+          type: string
+        staking_fee_discount_rate:
+          type: string
+          description: Fractional discount applied to positive fee rates
+        staking_reward_balance:
+          type: string
+        volume_history:
+          type: array
+          description: Last 30 days, newest first
+          items:
+            $ref: '#/components/schemas/VolumeHistoryEntry'
+        fee_discount_rate:
+          type: integer
+          description: Referral fee discount in whole percent (4 = 4%)
+        is_trading_enabled:
+          type: boolean
+          description: Always true for API wallet requests
+        min_deposit_usd:
+          type: integer
+        min_withdraw_usd:
+          type: integer
+        accounts:
+          type: array
+          description: '`scope=all` only'
+          items:
+            $ref: '#/components/schemas/AggregateAccountRef'
+    Position:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Engine position ID
+          example: 3232
+        account_id:
+          type: string
+        margin_mode:
+          type: string
+          enum:
+          - cross
+          - isolated
+        leverage:
+          type: integer
+          example: 20
+        size:
+          type: string
+          description: Signed size in base asset (positive = long, negative = short)
+          example: '-0.09397'
+        entry_price:
+          type: string
+          example: '81558.69091944'
+        iso_balance:
+          type: string
+          description: Isolated margin ("0" for cross)
+          example: '0'
+        accumulated_funding_fees:
+          type: string
+          description: Signed funding settled on this position (positive = received)
+          example: '270.2568393349164184'
+        create_timestamp:
+          type: integer
+          format: int64
+        update_timestamp:
+          type: integer
+          format: int64
+        symbol:
+          type: string
+          example: BTC-USD
+        upnl:
+          type: string
+          description: (mark - entry_price) * size, rounded to the market quote precision
+          example: '-8.48714642'
+        maintenance_margin:
+          type: string
+          description: mark notional * MMR - maintenance amount of the notional tier
+          example: '30.69022933'
+        bankruptcy_price:
+          type: string
+          description: Unrounded; "0" when none
+          example: '157758.0419616276541'
+        liquidation_price:
+          type: string
+          description: Unrounded; "0" when none
+          example: '156750.9643582120454'
+    PositionsResponse:
+      type: object
+      properties:
+        positions:
+          type: array
+          description: Non-zero positions, most recently updated first
+          items:
+            $ref: '#/components/schemas/Position'
+        count:
+          type: integer
+        accounts:
+          type: array
+          description: '`scope=all` only'
+          items:
+            $ref: '#/components/schemas/AggregateAccountRef'
+    ClosedPosition:
+      type: object
+      description: Legacy engine position row. Keys are PascalCase.
+      properties:
+        ID:
+          type: integer
+          format: int64
+        AccountID:
+          type: string
+        Symbol:
+          type: string
+        MarginMode:
+          type: string
+          enum:
+          - cross
+          - isolated
+        OpenTimestamp:
+          type: integer
+          format: int64
+        CloseTimestamp:
+          type: integer
+          format: int64
+          nullable: true
+    ClosedPositionsResponse:
+      type: object
+      properties:
+        positions:
+          type: array
+          nullable: true
+          description: null when there are no rows
+          items:
+            $ref: '#/components/schemas/ClosedPosition'
+        count:
+          type: integer
+    OrderHistoryResult:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 243140293
+        client_order_id:
+          type: string
+        account_id:
+          type: string
+        symbol:
+          type: string
+          example: BTC-USD
+        strategy_id:
+          type: string
+          nullable: true
+        is_primary:
+          type: boolean
+          nullable: true
+        close_reason:
+          type: string
+          nullable: true
+          description: Why the order closed (e.g. `order_would_match_immediately`, `order_expired_in_match`, `user_canceled`, or a rejection message)
+        error_message:
+          type: string
+          description: Present when close_reason is non-empty (same text)
+        side:
+          type: string
+          enum:
+          - buy
+          - sell
+        status:
+          type: string
+          enum:
+          - pending
+          - open
+          - filled
+          - canceled
+          - untriggered
+          - rejected
+          - expired
+        type:
+          type: string
+          enum:
+          - market
+          - limit
+          - stop
+          - stop_limit
+          - take_profit
+          - take_profit_limit
+          - trailing_stop_market
+        origin_type:
+          type: string
+          nullable: true
+          description: Original type of a triggered conditional order ("" when not applicable)
+        auto_close_type:
+          type: string
+          nullable: true
+          description: null or "" for user orders; otherwise liquidation, adl, bankrupt, if_transfer, vault_withdrawal, slp_transfer
+        time_in_force:
+          type: string
+          nullable: true
+          enum:
+          - GTC
+          - FOK
+          - IOC
+        working_type:
+          type: string
+          nullable: true
+          enum:
+          - none
+          - contract_price
+          - mark_price
+        size:
+          type: string
+        filled:
+          type: string
+        price:
+          type: string
+        stop_price:
+          type: string
+        post_only:
+          type: boolean
+        reduce_only:
+          type: boolean
+        close_position:
+          type: boolean
+        price_protect:
+          type: boolean
+        callback_rate:
+          type: string
+          description: Trailing stop orders only
+        activation_price:
+          type: string
+          description: Trailing stop orders only
+        trailing_extreme:
+          type: string
+          description: Trailing stop orders only
+        trailing_activated:
+          type: boolean
+          description: Trailing stop orders only
+        create_timestamp:
+          type: integer
+          format: int64
+        entry_timestamp:
+          type: integer
+          format: int64
+        event_timestamp:
+          type: integer
+          format: int64
+    OrderHistoryResponse:
+      type: object
+      properties:
+        orders:
+          type: array
+          nullable: true
+          description: null when there are no rows
+          items:
+            $ref: '#/components/schemas/OrderHistoryResult'
+        count:
+          type: integer
+        accounts:
+          type: array
+          description: '`scope=all` or `include_copies=true` only'
+          items:
+            $ref: '#/components/schemas/AggregateAccountRef'
+    FillHistoryResult:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Fill ID (use as `fromId` cursor)
+          example: 36026
+        trade_id:
+          type: integer
+          format: int64
+          description: Global trade sequence (use as `since_trade_id` cursor)
+          example: 18073
+        order_id:
+          type: integer
+          format: int64
+        account_id:
+          type: string
+        symbol:
+          type: string
+        side:
+          type: string
+          enum:
+          - buy
+          - sell
+        role:
+          type: string
+          description: '`mixed` is possible only with aggregate=true'
+          enum:
+          - maker
+          - taker
+          - mixed
+        price:
+          type: string
+          description: Execution price (VWAP with aggregate=true)
+        size:
+          type: string
+        realized_pnl:
+          type: string
+          description: Gross of fees
+        fee:
+          type: string
+          description: Commission (negative = maker rebate)
+        fee_type:
+          type: string
+          description: '`mixed` is possible only with aggregate=true'
+          enum:
+          - none
+          - commission
+          - liquidation
+          - funding
+          - mixed
+        liquidation_fee:
+          type: string
+          description: Present when the fill paid a liquidation fee
+        entry_price:
+          type: string
+          description: Position-reducing fills only
+        close_price:
+          type: string
+          description: Position-reducing fills only
+        margin:
+          type: string
+          description: Position-reducing fills only (entry_price * closed size / leverage)
+        roi_pct:
+          type: string
+          description: Position-reducing fills only (realized_pnl / margin * 100)
+        leverage:
+          type: integer
+          description: Position-reducing fills only
+        timestamp:
+          type: integer
+          format: int64
+        auto_close_type:
+          type: string
+          nullable: true
+          description: Auto-close type of the order (liquidation, adl, bankrupt, if_transfer, vault_withdrawal, slp_transfer); null/empty for user orders
+        client_order_id:
+          type: string
+        fill_count:
+          type: integer
+          description: aggregate=true only
+        notional:
+          type: string
+          description: aggregate=true only
+    FillHistoryResponse:
+      type: object
+      properties:
+        fills:
+          type: array
+          nullable: true
+          description: null when there are no rows
+          items:
+            $ref: '#/components/schemas/FillHistoryResult'
+        count:
+          type: integer
+        accounts:
+          type: array
+          description: '`scope=all` or `include_copies=true` only'
+          items:
+            $ref: '#/components/schemas/AggregateAccountRef'
+    PositionHistory:
+      type: object
+      description: One directional position life (open through close). IDs are strings; decimals are strings.
+      properties:
+        id:
+          type: string
+          example: fill:34930
+        position_id:
+          type: string
+          description: Engine position ID
+        account_id:
+          type: string
+        symbol:
+          type: string
+        side:
+          type: string
+          enum:
+          - long
+          - short
+        status:
+          type: string
+          description: '`open` appears only in position_checkpoints'
+          enum:
+          - open
+          - partially_closed
+          - closed
+        margin_mode:
+          type: string
+        leverage:
+          type: integer
+        entry_price:
+          type: string
+        avg_close_price:
+          type: string
+        realized_pnl:
+          type: string
+          description: Trading PnL of closing legs, before fees and funding
+        trading_fees:
+          type: string
+          description: Trading + builder + liquidation fees (maker rebates signed)
+        funding_pnl:
+          type: string
+          description: Signed funding for this life (positive = received)
+        net_realized_pnl:
+          type: string
+          description: realized_pnl - trading_fees + funding_pnl
+        roi_pct:
+          type: string
+          description: net_realized_pnl / closing_margin * 100
+        max_held:
+          type: string
+        closed_size:
+          type: string
+        remaining_size:
+          type: string
+        open_timestamp:
+          type: integer
+          format: int64
+        close_timestamp:
+          type: integer
+          format: int64
+          nullable: true
+        last_close_timestamp:
+          type: integer
+          format: int64
+        update_timestamp:
+          type: integer
+          format: int64
+        last_fill_id:
+          type: string
+        last_fill_seq:
+          type: integer
+          format: int64
+        revision:
+          type: integer
+          format: int64
+        data_complete:
+          type: boolean
+          description: false when the position was already open when tracking started
+        opened_size:
+          type: string
+        entry_notional:
+          type: string
+        close_notional:
+          type: string
+        closing_margin:
+          type: string
+        funding_baseline:
+          type: string
+        has_copied_fills:
+          type: boolean
+          description: include_copies=true only
+    PositionHistoryResponse:
+      type: object
+      properties:
+        positions:
+          type: array
+          description: Lives with at least one reduction, newest open_timestamp first
+          items:
+            $ref: '#/components/schemas/PositionHistory'
+        position_checkpoints:
+          type: array
+          description: Latest life per account/symbol (including open, never-reduced positions); not filtered or paged
+          items:
+            $ref: '#/components/schemas/PositionHistory'
+        count:
+          type: integer
+        has_more:
+          type: boolean
+        next_cursor:
+          type: string
+          description: Empty string when there are no more pages
+        account_ids:
+          type: array
+          items:
+            type: string
+        includes_copies:
+          type: boolean
+          description: include_copies=true only
+        accounts:
+          type: array
+          description: '`scope=all` or `include_copies=true` only'
+          items:
+            $ref: '#/components/schemas/AggregateAccountRef'
+    PositionHistoryFill:
+      type: object
+      properties:
+        history_id:
+          type: string
+        fill_id:
+          type: string
+        trade_id:
+          type: string
+        order_id:
+          type: string
+        account_id:
+          type: string
+        symbol:
+          type: string
+        side:
+          type: string
+          enum:
+          - buy
+          - sell
+        action:
+          type: string
+          enum:
+          - open
+          - increase
+          - decrease
+          - close
+        size:
+          type: string
+          description: Size allocated to this life (a flip fill is split across two lives)
+        price:
+          type: string
+        realized_pnl:
+          type: string
+        fee:
+          type: string
+          description: Allocated trading + builder + liquidation fee
+        order_type:
+          type: string
+        role:
+          type: string
+          enum:
+          - maker
+          - taker
+        timestamp:
+          type: integer
+          format: int64
+        revision:
+          type: integer
+          format: int64
+    PositionHistoryFillsResponse:
+      type: object
+      properties:
+        position:
+          allOf:
+          - $ref: '#/components/schemas/PositionHistory'
+          nullable: true
+          description: Current summary of this life (null if not found in the selected accounts)
+        fills:
+          type: array
+          items:
+            $ref: '#/components/schemas/PositionHistoryFill'
+        count:
+          type: integer
+        next_cursor:
+          type: string
+        has_more:
+          type: boolean
+        account_ids:
+          type: array
+          items:
+            type: string
+    FundingHistoryResult:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 207238
+        transaction_id:
+          type: integer
+          format: int64
+        account_id:
+          type: string
+        position_id:
+          type: integer
+          format: int64
+        symbol:
+          type: string
+          example: BTC-USD
+        position_size:
+          type: string
+          description: Absolute position size
+        position_side:
+          type: string
+          enum:
+          - Long
+          - Short
+        funding_rate:
+          type: string
+          description: Hourly funding rate applied
+          example: '0.0000125'
+        amount:
+          type: string
+          description: Payment (positive = received, negative = paid) = -size * mark * rate
+        timestamp:
+          type: integer
+          format: int64
+    FundingHistoryResponse:
+      type: object
+      properties:
+        funding:
+          type: array
+          nullable: true
+          description: null when there are no rows
+          items:
+            $ref: '#/components/schemas/FundingHistoryResult'
+        count:
+          type: integer
+        accounts:
+          type: array
+          description: '`scope=all` only'
+          items:
+            $ref: '#/components/schemas/AggregateAccountRef'
+    TransactionHistoryResult:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        request_id:
+          type: string
+          example: fill:36026:pnl
+        account_id:
+          type: string
+        type:
+          type: string
+          enum:
+          - deposit
+          - withdraw
+          - fee
+          - realized_pnl
+          - liquidation
+          - funding
+          - reward_grant
+          - reward_reclaim
+          - credit
+          - transfer
+          - liquidation_income
+        amount:
+          type: string
+          description: Signed balance change
+        asset:
+          type: string
+        blockchain:
+          type: string
+        blockchain_address:
+          type: string
+        tx_hash:
+          type: string
+          nullable: true
+        recipient_address:
+          type: string
+          nullable: true
+          description: Always null on public-selector reads
+        status:
+          type: string
+          enum:
+          - pending
+          - completed
+          - pending_settlement
+          - settled
+          - failed
+          - cancelled
+        timestamp:
+          type: integer
+          format: int64
+        asset_symbol:
+          type: string
+          nullable: true
+        asset_amount:
+          type: string
+          nullable: true
+        metadata:
+          type: object
+          additionalProperties: true
+          description: Type-specific details (recipient type removed on public reads)
+        settlement_tx_hash:
+          type: string
+    TransactionHistoryResponse:
+      type: object
+      properties:
+        transactions:
+          type: array
+          nullable: true
+          description: null when there are no rows
+          items:
+            $ref: '#/components/schemas/TransactionHistoryResult'
+        count:
+          type: integer
+        accounts:
+          type: array
+          description: '`scope=all` only'
+          items:
+            $ref: '#/components/schemas/AggregateAccountRef'
+  responses:
+    BadRequest:
+      description: Invalid parameter
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            invalid_account_id:
+              value:
+                error: invalid account_id
+            invalid_limit:
+              value:
+                error: invalid limit parameter
+            invalid_scope:
+              value:
+                error: 'invalid scope: only scope=all is supported'
+    Unauthorized:
+      description: No auth and no public selector, or API wallet authentication failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            no_selector:
+              value:
+                error: authentication required or provide vault_id, account_id, or blockchain_address
+            missing_headers:
+              value:
+                error: missing API wallet authentication headers
+            expired:
+              value:
+                error: signature expired or invalid timestamp
+            bad_signature:
+              value:
+                error: authentication failed
+            replay:
+              value:
+                error: request already processed
+    Forbidden:
+      description: Selector not allowed for this caller
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Account not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            account:
+              value:
+                error: account not found
+            wallet:
+              value:
+                error: user not found
+paths:
+  /v2/account:
+    get:
+      tags:
+      - Account
+      summary: Get account info
+      description: |
+        Account balances, margin totals, default and per-symbol settings, and sub-accounts.
+
+        `vault_id` queries additionally return `inventory_costs_usd`, `custody_balances`, `conversion_reserved_usd`, `slp_adl` and blank the wallet fields. `scope=all` sums balances across the family and adds `accounts`.
+      parameters:
+      - $ref: '#/components/parameters/AccountIdQuery'
+      - $ref: '#/components/parameters/VaultIdQuery'
+      - $ref: '#/components/parameters/BlockchainQuery'
+      - $ref: '#/components/parameters/BlockchainAddressQuery'
+      - $ref: '#/components/parameters/SubAccountIdQuery'
+      - $ref: '#/components/parameters/ScopeQuery'
+      responses:
+        '200':
+          description: Account information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetAccountResponse'
+              example:
+                account_id: 01a144dc-27e4-706c-ac46-9c2c1e77d60b
+                blockchain: cardano
+                blockchain_address: addr1qx...
+                wallet_balance: '10000'
+                available_balance: '7500'
+                copy_reserved_balance: '0'
+                copy_deployed_margin: '0'
+                copy_profit_share_reserved: '0'
+                unrealized_pnl: '250.5'
+                margin_balance: '10250.5'
+                total_margin: '2500'
+                position_initial_margin: '2000'
+                maintenance_margin: '500'
+                sub_accounts: []
+                default_margin_mode: cross
+                default_leverage: 10
+                symbol_settings:
+                  BTC-USD:
+                    margin_mode: cross
+                    leverage: 20
+                    allow_pre_trade: false
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          description: Vault inventory data unavailable (`vault_id` queries)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                inventory:
+                  value:
+                    error: Vault inventory is unavailable
+                adl:
+                  value:
+                    error: Vault ADL profiles are unavailable
+  /v2/balances:
+    get:
+      tags:
+      - Account
+      summary: Get balances
+      description: Returns a one-element array (asset `USDT`) with the balance and margin breakdown. `scope` is ignored (no aggregate).
+      parameters:
+      - $ref: '#/components/parameters/AccountIdQuery'
+      - $ref: '#/components/parameters/VaultIdQuery'
+      - $ref: '#/components/parameters/BlockchainQuery'
+      - $ref: '#/components/parameters/BlockchainAddressQuery'
+      - $ref: '#/components/parameters/SubAccountIdQuery'
+      responses:
+        '200':
+          description: Balance details
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BalanceResponse'
+              example:
+              - asset: USDT
+                walletBalance: '100'
+                unrealizedPnl: '0'
+                marginBalance: '100'
+                maintMargin: '0'
+                initialMargin: '0'
+                positionInitialMargin: '0'
+                openOrderInitialMargin: '0'
+                crossWalletBalance: '100'
+                crossUnPnl: '0'
+                availableBalance: '100'
+                maxWithdrawAmount: '100'
+                marginAvailable: true
+                updateTime: 1792438835441
+                lockedRewards: '0'
+                maxWithdrawAfterRewards: '100'
+                stakingRewardBalance: '0'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v2/portfolio:
+    get:
+      tags:
+      - Account
+      summary: Get portfolio summary
+      description: All-time PnL, volume and flows, account-value history, fee tier data, and 30-day volume history. `scope=all` merges the family and adds `accounts`.
+      parameters:
+      - $ref: '#/components/parameters/AccountIdQuery'
+      - $ref: '#/components/parameters/VaultIdQuery'
+      - $ref: '#/components/parameters/BlockchainQuery'
+      - $ref: '#/components/parameters/BlockchainAddressQuery'
+      - $ref: '#/components/parameters/SubAccountIdQuery'
+      - $ref: '#/components/parameters/ScopeQuery'
+      responses:
+        '200':
+          description: Portfolio summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PortfolioSummaryResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v2/positions:
+    get:
+      tags:
+      - Positions
+      summary: Get open positions
+      description: Non-zero positions with unrealized PnL, maintenance margin, bankruptcy and liquidation prices, sorted by update_timestamp descending.
+      parameters:
+      - $ref: '#/components/parameters/SymbolQuery'
+      - name: position_id
+        in: query
+        required: false
+        description: Engine position ID (unsigned integer); requires `symbol`
+        schema:
+          type: string
+      - $ref: '#/components/parameters/AccountIdQuery'
+      - $ref: '#/components/parameters/VaultIdQuery'
+      - $ref: '#/components/parameters/BlockchainQuery'
+      - $ref: '#/components/parameters/BlockchainAddressQuery'
+      - $ref: '#/components/parameters/SubAccountIdQuery'
+      - $ref: '#/components/parameters/ScopeQuery'
+      responses:
+        '200':
+          description: Open positions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PositionsResponse'
+              example:
+                positions:
+                - id: 3232
+                  account_id: 01a144dc-27e4-706c-ac46-9c2c1e77d60b
+                  margin_mode: cross
+                  leverage: 20
+                  size: '-0.09397'
+                  entry_price: '81558.69091944'
+                  iso_balance: '0'
+                  accumulated_funding_fees: '270.2568393349164184'
+                  create_timestamp: 1791865713298
+                  update_timestamp: 1791865713298
+                  symbol: BTC-USD
+                  upnl: '-8.48714642'
+                  maintenance_margin: '30.69022933'
+                  bankruptcy_price: '157758.0419616276541'
+                  liquidation_price: '156750.9643582120454'
+                count: 1
+        '400':
+          description: Invalid parameter (e.g. `symbol parameter is required when position_id is provided`, `invalid position_id format`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v2/closedPositions:
+    get:
+      tags:
+      - Positions
+      summary: Get closed engine positions (legacy)
+      description: |
+        Minimal rows (PascalCase keys, no size or PnL) for engine positions with a close timestamp, sorted by close_timestamp descending. No cursor; `scope` is ignored. Prefer `/v2/history/position?status=closed`.
+      parameters:
+      - $ref: '#/components/parameters/SymbolQuery'
+      - name: startTime
+        in: query
+        required: false
+        description: Inclusive lower bound on close timestamp (Unix ms)
+        schema:
+          type: integer
+          format: int64
+      - name: endTime
+        in: query
+        required: false
+        description: Inclusive upper bound on close timestamp (Unix ms)
+        schema:
+          type: integer
+          format: int64
+      - name: limit
+        in: query
+        required: false
+        description: Clamped to 1000; values <= 0 use the default.
+        schema:
+          type: integer
+          maximum: 1000
+          default: 100
+      - $ref: '#/components/parameters/AccountIdQuery'
+      - $ref: '#/components/parameters/VaultIdQuery'
+      - $ref: '#/components/parameters/BlockchainQuery'
+      - $ref: '#/components/parameters/BlockchainAddressQuery'
+      - $ref: '#/components/parameters/SubAccountIdQuery'
+      responses:
+        '200':
+          description: Closed positions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClosedPositionsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v2/history/order:
+    get:
+      tags:
+      - History
+      summary: Get order history
+      description: Orders sorted by create_timestamp descending. Page with `fromOrderID` = last row `id`.
+      parameters:
+      - $ref: '#/components/parameters/SymbolQuery'
+      - name: side
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - buy
+          - sell
+      - name: type
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - market
+          - limit
+          - stop
+          - stop_limit
+          - take_profit
+          - take_profit_limit
+          - trailing_stop_market
+      - name: status
+        in: query
+        required: false
+        description: '`1` pending, `2` open, `3` filled, `4` canceled, `5` untriggered, `6` rejected, `7` expired'
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 7
+      - name: order_id
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: startTime
+        in: query
+        required: false
+        description: Inclusive lower bound on create_timestamp (Unix ms)
+        schema:
+          type: integer
+          format: int64
+      - name: endTime
+        in: query
+        required: false
+        description: Inclusive upper bound on create_timestamp (Unix ms)
+        schema:
+          type: integer
+          format: int64
+      - name: limit
+        in: query
+        required: false
+        description: Clamped to 1000; values <= 0 use the default.
+        schema:
+          type: integer
+          maximum: 1000
+          default: 100
+      - name: fromOrderID
+        in: query
+        required: false
+        description: Cursor - returns orders with id less than this value
+        schema:
+          type: integer
+          format: int64
+      - name: source
+        in: query
+        required: false
+        description: Orders placed by a bot service (client_order_id prefix `twap-`, `grid-`, `copy:`)
+        schema:
+          type: string
+          enum:
+          - twap
+          - grid
+          - copy
+      - $ref: '#/components/parameters/AccountIdQuery'
+      - $ref: '#/components/parameters/VaultIdQuery'
+      - $ref: '#/components/parameters/BlockchainQuery'
+      - $ref: '#/components/parameters/BlockchainAddressQuery'
+      - $ref: '#/components/parameters/SubAccountIdQuery'
+      - $ref: '#/components/parameters/ScopeQuery'
+      - $ref: '#/components/parameters/IncludeCopiesQuery'
+      responses:
+        '200':
+          description: Order history
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderHistoryResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v2/history/fill:
+    get:
+      tags:
+      - History
+      summary: Get fill history
+      description: |
+        Fills sorted by timestamp descending. Page backward with `fromId` = last row `id`, or poll forward with `since_trade_id` (ascending trade_id; cannot be combined with `fromId`).
+      parameters:
+      - $ref: '#/components/parameters/SymbolQuery'
+      - name: side
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - buy
+          - sell
+      - name: role
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - maker
+          - taker
+      - name: auto_close_type
+        in: query
+        required: false
+        description: Filter by the order's auto-close type
+        schema:
+          type: string
+          enum:
+          - liquidation
+          - adl
+          - bankrupt
+          - if_transfer
+          - vault_withdrawal
+          - slp_transfer
+      - name: order_id
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - $ref: '#/components/parameters/StartTimeQuery'
+      - $ref: '#/components/parameters/EndTimeQuery'
+      - name: limit
+        in: query
+        required: false
+        description: Clamped to 1000; values <= 0 use the default.
+        schema:
+          type: integer
+          maximum: 1000
+          default: 500
+      - name: fromId
+        in: query
+        required: false
+        description: Backward cursor - fills older than the fill with this id
+        schema:
+          type: integer
+          format: int64
+      - name: since_trade_id
+        in: query
+        required: false
+        description: Forward cursor - fills with trade_id greater than this value, ascending
+        schema:
+          type: integer
+          format: int64
+      - name: source
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - twap
+          - grid
+          - copy
+      - name: aggregate
+        in: query
+        required: false
+        description: true = one row per order (VWAP price, summed size/fee/realized_pnl, fill_count, notional)
+        schema:
+          type: boolean
+      - $ref: '#/components/parameters/AccountIdQuery'
+      - $ref: '#/components/parameters/VaultIdQuery'
+      - $ref: '#/components/parameters/BlockchainQuery'
+      - $ref: '#/components/parameters/BlockchainAddressQuery'
+      - $ref: '#/components/parameters/SubAccountIdQuery'
+      - $ref: '#/components/parameters/ScopeQuery'
+      - $ref: '#/components/parameters/IncludeCopiesQuery'
+      responses:
+        '200':
+          description: Fill history
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FillHistoryResponse'
+        '400':
+          description: Invalid parameter (e.g. `cannot use both fromId and since_trade_id`, `invalid aggregate parameter`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v2/history/position:
+    get:
+      tags:
+      - History
+      summary: Get position history
+      description: |
+        Directional position lives that have at least one reduction (partial or full close), sorted by open_timestamp descending, plus `position_checkpoints` for live reconciliation.
+      parameters:
+      - $ref: '#/components/parameters/SymbolQuery'
+      - name: side
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - long
+          - short
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - closed
+          - partially_closed
+      - name: startTime
+        in: query
+        required: false
+        description: Inclusive lower bound on last_close_timestamp (Unix ms)
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+      - name: endTime
+        in: query
+        required: false
+        description: Inclusive upper bound on last_close_timestamp (Unix ms); must not be less than startTime
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+      - $ref: '#/components/parameters/PositionHistoryLimitQuery'
+      - $ref: '#/components/parameters/PositionHistoryCursorQuery'
+      - $ref: '#/components/parameters/AccountIdQuery'
+      - $ref: '#/components/parameters/VaultIdQuery'
+      - $ref: '#/components/parameters/BlockchainQuery'
+      - $ref: '#/components/parameters/BlockchainAddressQuery'
+      - $ref: '#/components/parameters/SubAccountIdQuery'
+      - $ref: '#/components/parameters/ScopeQuery'
+      - $ref: '#/components/parameters/IncludeCopiesQuery'
+      responses:
+        '200':
+          description: Position history
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PositionHistoryResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v2/history/position/{id}/fills:
+    get:
+      tags:
+      - History
+      summary: Get execution legs of a position life
+      description: Legs sorted by timestamp descending, plus the current summary of that life. Only rows owned by the selected account(s) are returned.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Position history id (e.g. `fill:34930`), max 100 characters
+        schema:
+          type: string
+          maxLength: 100
+      - $ref: '#/components/parameters/PositionHistoryLimitQuery'
+      - $ref: '#/components/parameters/PositionHistoryCursorQuery'
+      - $ref: '#/components/parameters/AccountIdQuery'
+      - $ref: '#/components/parameters/VaultIdQuery'
+      - $ref: '#/components/parameters/BlockchainQuery'
+      - $ref: '#/components/parameters/BlockchainAddressQuery'
+      - $ref: '#/components/parameters/SubAccountIdQuery'
+      - $ref: '#/components/parameters/ScopeQuery'
+      responses:
+        '200':
+          description: Position legs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PositionHistoryFillsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v2/history/funding:
+    get:
+      tags:
+      - History
+      summary: Get funding payment history
+      description: Funding payments sorted by id descending. Page with `fromId` = last row `id`.
+      parameters:
+      - $ref: '#/components/parameters/SymbolQuery'
+      - name: position_side
+        in: query
+        required: false
+        description: Case-sensitive
+        schema:
+          type: string
+          enum:
+          - Long
+          - Short
+      - $ref: '#/components/parameters/StartTimeQuery'
+      - $ref: '#/components/parameters/EndTimeQuery'
+      - name: limit
+        in: query
+        required: false
+        description: Clamped to 1000; values <= 0 use the default.
+        schema:
+          type: integer
+          maximum: 1000
+          default: 500
+      - name: fromId
+        in: query
+        required: false
+        description: Cursor - records with id less than this value
+        schema:
+          type: integer
+          format: int64
+      - $ref: '#/components/parameters/AccountIdQuery'
+      - $ref: '#/components/parameters/VaultIdQuery'
+      - $ref: '#/components/parameters/BlockchainQuery'
+      - $ref: '#/components/parameters/BlockchainAddressQuery'
+      - $ref: '#/components/parameters/SubAccountIdQuery'
+      - $ref: '#/components/parameters/ScopeQuery'
+      responses:
+        '200':
+          description: Funding payment history
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FundingHistoryResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v2/history/transaction:
+    get:
+      tags:
+      - History
+      summary: Get transaction history
+      description: All balance-changing events sorted by timestamp descending, then id descending. Page with `fromId` = last row `id`.
+      parameters:
+      - name: type
+        in: query
+        required: false
+        description: |
+          Comma-separated or repeated. Integers `1` deposit, `2` withdraw, `3` fee, `4` realized_pnl, `5` liquidation, `6` funding, `7` reward_grant, `8` reward_reclaim, `9` credit, `10` transfer, `11` liquidation_income, or the names themselves.
+        schema:
+          type: string
+        example: 1,2
+      - name: status
+        in: query
+        required: false
+        description: '`1` pending, `2` completed, `3` pending_settlement, `4` settled, `5` failed, `6` cancelled'
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 6
+      - $ref: '#/components/parameters/StartTimeQuery'
+      - $ref: '#/components/parameters/EndTimeQuery'
+      - name: limit
+        in: query
+        required: false
+        description: Clamped to 1000; values <= 0 use the default.
+        schema:
+          type: integer
+          maximum: 1000
+          default: 100
+      - name: fromId
+        in: query
+        required: false
+        description: Cursor - rows strictly after this transaction in (timestamp desc, id desc) order
+        schema:
+          type: integer
+          format: int64
+      - $ref: '#/components/parameters/AccountIdQuery'
+      - $ref: '#/components/parameters/VaultIdQuery'
+      - $ref: '#/components/parameters/BlockchainQuery'
+      - $ref: '#/components/parameters/BlockchainAddressQuery'
+      - $ref: '#/components/parameters/SubAccountIdQuery'
+      - $ref: '#/components/parameters/ScopeQuery'
+      responses:
+        '200':
+          description: Transaction history
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionHistoryResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403':
+          $ref: '#/components/responses/Forbidden'
