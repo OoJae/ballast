@@ -130,6 +130,25 @@ export interface ReplayOptions {
   /** Extra receive-time read past `toMs`, for records that arrive late (default 10 s). */
   slackMs?: number;
   onProgress?: (lines: number, recvMs: number) => void;
+  /**
+   * Called for every Book Health sample in the window with the exact book it was measured on,
+   * so consumers (the public API's replay frames) see the same state the aggregate does.
+   */
+  onHealthSample?: (sample: HealthSample) => void;
+  /** Called for every taker buy in the window (the maker fills it took, in L3 order). */
+  onTakerBuy?: (symbol: string, buy: TakerBuy) => void;
+}
+
+export interface HealthSample {
+  symbol: string;
+  /** Engine time of the sample (a multiple of `healthSampleMs`). */
+  tMs: number;
+  spec: MarketSpec;
+  /** The live replay book; read it synchronously and never mutate it. */
+  book: Readonly<L3Book>;
+  levels: LevelBook;
+  pair: BookHealthPair;
+  armed: boolean;
 }
 
 export interface ReplayStats {
@@ -304,6 +323,7 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
     st.out.stats.takerBuys += 1;
     const s = realizedSavings(t, t.cfAsks, ballast, spec);
     if (s.touchedBallast) st.out.savings.push(s);
+    opts.onTakerBuy?.(st.out.symbol, { takerOrderId: t.takerOrderId, tMs: t.tMs, fills: t.fills });
   };
 
   /** Emits grid and health samples for engine times strictly before `t`, from the current book. */
@@ -335,8 +355,18 @@ export async function replay(opts: ReplayOptions): Promise<ReplayResult> {
       if (st.nextHealthMs === next) {
         if (next >= opts.fromMs && next < opts.toMs) {
           st.pair ??= healthPair(st, spec, ballast);
-          st.out.health.add(st.pair, healthMs, armed(st.out.symbol, next));
+          const isArmed = armed(st.out.symbol, next);
+          st.out.health.add(st.pair, healthMs, isArmed);
           st.out.stats.healthSamples += 1;
+          opts.onHealthSample?.({
+            symbol: st.out.symbol,
+            tMs: next,
+            spec,
+            book: st.book.book,
+            levels: st.levels,
+            pair: st.pair,
+            armed: isArmed,
+          });
         }
         st.nextHealthMs += healthMs;
       }
