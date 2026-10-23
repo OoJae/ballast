@@ -219,3 +219,72 @@ Dated notes on confusion, docs/API mismatches, and breakage, each with a propose
 - **Unknown:** whether the house posts its bids post-only. That is not public, and Ballast does not parse house order flags.
 - **Sim choice:** a recorded bid that opens at or above a resting Ballast ask takes it for the crossing size (25 of the 27 fills in the recorded replay). This is the conservative reading: more fills, more stress on cover and the floor.
 - **Fix:** revisit if Strike says how the house quotes. The same-size taker re-match is unaffected.
+
+## 2026-10-23: the keeper reads margin from `/v2/balances` (VERIFY in apps/keeper)
+
+- **Docs:** user-api.yaml documents `/v2/balances` as a one-element USDT array with `marginBalance` and `maintMargin`. The keeper takes equity = `marginBalance` and the margin ratio = `maintMargin / marginBalance` (rounded up), refreshed every 5 s. A read older than 30 s counts as unknown, which is the reduce band: cancel, no creates.
+- **Unverified:** which row (and asset) carries the margin of an account funded with ADA or USDM, and whether USDT here is treated 1:1 as USD.
+- **Fix:** after D5, compare `/v2/balances` with `/v2/portfolio` and the Strike UI on holder #0's account.
+
+## 2026-10-23: the loss stop values paired coins at Strike's index (VERIFY in apps/keeper)
+
+- **What M6 does:** combined-MTM PnL is integrated tick by tick: the change in perp equity plus `prior short × Δindex` for the coins paired with the short. A buy-back is therefore not counted as a loss. The plan says the wallet coins should be valued at the CEX/DEX mid.
+- **Fix:** add a CEX/DEX mid source (the same one the reference-sanity rule needs) and value the paired coins at it.
+
+## 2026-10-23: the CEX reference for `reference-sanity` is not wired (VERIFY in apps/keeper)
+
+- **What M6 does:** the keeper tells the Guard `reference: unavailable`, which passes only while the index is fresh (≤ 3 s). That is the same choice the Critic's replay makes, since no CEX feed is recorded.
+- **Fix:** add a read-only CEX median (USDT pairs converted with `/price/v2/fxRates`) and feed `deviationBps`.
+
+## 2026-10-23: Proof-of-Conduct vault check uses an unverified public read (VERIFY in apps/keeper)
+
+- **What M6 does:** `vaultCheck` reads `GET /v2/vault/positions?account_id=` without a key every 60 s. It treats a null or empty `positions` list (or an empty array) as no vault shares. Until the first successful read, shares are assumed held, which blocks creates (`dedicated-account`).
+- **Unverified:** the response shape, and whether the route is public for any account id.
+- **Fix:** one live GET on holder #0 after D4, then pin the schema.
+
+## 2026-10-23: the protocol-as-taker fill budget is not enforced live (VERIFY in apps/keeper)
+
+- **Plan:** at most 25% of the day's capacity may be sold to the protocol (house) as taker.
+- **Problem:** measuring it means knowing which taker fills are the house's. The data policy forbids parsing vault client ids or identifying the house from private data.
+- **What M6 does:** the keeper calls `planRequote` without `protocolTaker`. The engine and the simulator support the budget; the P2-blind $300 cap bounds the same exposure for now.
+- **Fix:** ask Strike for the opt-in (which waives the budget) or for an aggregate house-taker figure Ballast may use.
+
+## 2026-10-23: one user stream per key: the watchdog's confirmation path (VERIFY, D8)
+
+- **What M6 does:** the watchdog keeps its own `/ws/user-api` socket with the account's key to confirm cancels, plus a REST resync every 5 s. If Strike refuses a second socket for one key while the keeper holds one, the REST resync confirms instead; the e2e test with every order event dropped proves that path.
+- **Test-only difference:** `@ballast/strike-client` allows one UserStream per key per process, so the tests register a second key on the same fake account for the watchdog. In production they are separate hosts and the same key.
+- **Fix:** D8 measures it. If two sockets per key are refused, keep the REST path and say so in the runbook.
+
+## 2026-10-23: day-one hosts and reads not yet confirmed (VERIFY in apps/cli/src/dayone)
+
+- **Testnet WebSocket origin:** assumed to be `wss://api-v2-testnet.strikefinance.org` (mirroring REST). Also assumed: that testnet serves `/v2/l3/snapshot` for BTC-USD. D1 fails at once if either is wrong.
+- **D2's public read:** `GET /v2/order?account_id&client_order_id` with no key (FlexibleAuth) is the plan's pass condition. Ballast's signer refuses `account_id` on signed reads, so the script reads it unauthenticated. The signed read is recorded beside it.
+- **D3's builder balance:** which account receives builder fees, and whether its `walletBalance` moves on each fill or on a later payout, is unknown. D3 records the maker fill's `builder_fee` either way, and passes only if the builder account's balance is seen to rise.
+- **Fix:** each answer goes into EVIDENCE.md and the marker is removed.
+
+## 2026-10-23: day-one probe orders carry `bal_d<N>_…` ids, not policy-tied ids
+
+- **What M6 does:** D2, D3, D6, D7 and D8 place probe asks with ids like `bal_d7_<time>_<n>`. They are `bal_` orders (they pass the route allowlist and do not trip manual-activity detection), but they do not parse to a signed policy.
+- **Risk:** the public Proof-of-Conduct check ("every order parses to a signed policy") would flag them, and a running keeper would treat them as its own asks.
+- **Fix:** run the day-one checks with the keeper and watchdog stopped for that account (the runbook says so). Record every probe trade id with `insertProbe`, and teach the conduct check to accept the `bal_d<N>_` family only when it is listed in `probes`.
+
+## 2026-10-23: three keeper bugs found by the M6 chaos and wiring tests (fixed)
+
+- **Self-chasing:** an unconfirmed create (no stream event yet) that already rested on L3 was counted as house liquidity, so the keeper saw its own ask as the best non-Ballast ask and stood down. Fix: every live Ballast order, confirmed or not, is attributed on L3 by price and fingerprinted size, and removed from the counterfactual book.
+- **Fast L3 rebuilds went unnoticed:** a gap or `clear` that the feed rebuilt within milliseconds never showed as stale. Fix: any rebuild counts as stale data for the tick that first sees it, so resting asks are cancelled once and quoting resumes on the rebuilt book.
+- **Mempool spends were invisible to the Guard:** the keeper zeroed capacity on a pending spend, but the Guard and the engine still saw the confirmed cover. Fix: an unconfirmed spend now zeroes the cover the engine and the Guard plan against.
+
+## 2026-10-23: `ballast verify` now exempts reduce-only exits from invariant 2's retro-check
+
+- **Why:** the Guard checks cancels and reduce-only buy-backs only against `route-allowlist` and `dry-run` (plan section 6). A buy-back sent after a policy expired (the keeper closing a short on a cover loss) is correct behaviour, but verify v1 counted it as a create with no policy in force.
+- **Fix (done):** verify skips ops with `side: "buy"`. A sell op with no policy in force still fails (apps/cli/test/verify-exits.test.ts).
+
+## 2026-10-23: DRY_RUN evaluates the Guard as if armed
+
+- **What M6 does:** in DRY_RUN the keeper evaluates every create with `armed: true`. Otherwise the `arm-flag` rule would block every create, and the would-place log could never show "all 28 checks passed". The `dry-run` rule is evaluated last, and a dry-run decision is never "execute", so nothing can be sent. A wiring test proves no signer method is ever called in DRY_RUN.
+- **Read the logs knowing this:** `data/keeper/would-place.jsonl` records the hypothetical armed verdict. The decision record's `guard.decision` is `dry-run`.
+
+## 2026-10-23: the keeper and watchdog tests run in real time against the fake
+
+- **Cost:** the full suite went from about 34 s to about 97 s wall time. Most of it is the chaos and invariant files, which wait out real 2 s replace-batch spacing, 2 s silent-drop lookups and kill-retry windows.
+- **Fix:** give FakeStrike, the daemon and the strike-client timers one injectable clock (vitest fake timers do not reach the `ws` sockets), or split the slowest files further so they run in parallel.

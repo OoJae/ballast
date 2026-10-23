@@ -1417,10 +1417,15 @@ export function createDaemon(deps: KeeperDeps): KeeperDaemon {
         positions: mv.positions,
         positionsAgeMs: mv.positionsAgeMs,
         replicaP99Bps: p99,
+        // P2-blind until D6 validates the replica's P2 (plan section 5); the replica runs in
+        // market state for drift monitoring only.
         p2: { mode: "blind" },
         accounts: requoteAccounts(books, m),
         nowMs: now,
         seq,
+        // VERIFY: the protocol-as-taker fill budget needs to know which takers are the house;
+        // the data policy forbids identifying them from private data, so it is not wired live
+        // (FRICTION 2026-10-23). The P2-blind $300 cap bounds the same exposure meanwhile.
       });
       const floorTicks = plan.governor.floor?.ticks ?? 0n;
       if (lastFloorTicks !== floorTicks) floorChanged = true;

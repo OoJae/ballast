@@ -84,6 +84,8 @@ export async function live(ctx: LiveContext, args: DayOneArgs) {
   const builderKey = args.opts["builder-key"];
   const builder =
     builderAccount && builderKey ? ctx.client(ctx.signer(builderKey), builderAccount) : null;
+  // VERIFY: which account receives builder fees and whether its /v2/balances walletBalance moves
+  // on each fill or on a later payout (FRICTION 2026-10-23).
   const balance = async () =>
     builder
       ? ((await builder.get<BalanceRow[]>("/v2/balances"))?.[0]?.walletBalance ?? null)

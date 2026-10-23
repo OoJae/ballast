@@ -154,6 +154,7 @@ export async function live(ctx: LiveContext, args: DayOneArgs) {
     tick: new Grid(m.order_tick_price as string),
     step: new Grid(m.order_limit_step_size as string),
   };
+  // VERIFY: that testnet serves /v2/l3/snapshot for BTC-USD as mainnet does (FRICTION 2026-10-23).
   const snap: L3Snapshot = await ctx.reads.l3Snapshot(symbol);
   const bestAsk = snap.asks[0]?.price;
   const bestBid = snap.bids[0]?.price;
