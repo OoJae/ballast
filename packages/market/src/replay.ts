@@ -173,7 +173,7 @@ export interface ReplayResult {
  * resubscribe's ack and its snapshot may already be applied to the old book; they are replayed
  * on top of the snapshot when newer than it.
  */
-class ReplayBook {
+export class ReplayBook {
   readonly book: L3Book;
   private recent: L3Update[] = [];
   private buffered = 0;
