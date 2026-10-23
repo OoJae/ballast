@@ -177,10 +177,23 @@ export class TestCover implements CoverSource {
     return proof;
   }
 
+  /** An unconfirmed spend of the counted UTxOs (Ogmios): capacity is 0 until a later block. */
+  spend(accountId: string): void {
+    const st = this.states.get(accountId);
+    if (st)
+      st.mempoolSpend = {
+        txId: "f".repeat(64),
+        refs: st.proof.utxos.map((u) => u.ref),
+        seenAtMs: this.now(),
+        height: st.height,
+      };
+  }
+
   /** Re-prove the same cover at a new block (keeps it fresh). */
   refresh(accountId: string, label: string): void {
     const st = this.states.get(accountId);
-    if (st) this.set(accountId, label, st.coverBase / 1_000_000n);
+    // A flagged spend holds until the test proves a new cover with set().
+    if (st && !st.mempoolSpend) this.set(accountId, label, st.coverBase / 1_000_000n);
   }
 
   view(accountId: string): CoverState | null {
@@ -261,6 +274,8 @@ export interface HarnessOptions {
   config?: Partial<KeeperRuntimeConfig>;
   /** House book: scripted outside liquidity. */
   house?: boolean;
+  /** Spacing between L3 re-bootstraps (0 in most tests; larger to hold a gap open). */
+  rebuildCooldownMs?: number;
   dbPath?: string;
 }
 
@@ -308,7 +323,7 @@ export async function startKeeper(opts: HarnessOptions = {}): Promise<KeeperHarn
     logger,
     marketsEveryMs: 1_000,
     positionsEveryMs: 1_000,
-    rebuildCooldownMs: 0,
+    rebuildCooldownMs: opts.rebuildCooldownMs ?? 0,
     onChange: () => daemon?.requestTick("market"),
   });
 

@@ -90,6 +90,7 @@ export class StaticMarket implements MarketSource {
       marketsAgeMs: this.marketsAgeMs,
       book: this.book,
       l3Synced: this.l3Synced,
+      l3RebuildAtMs: null,
       price,
       indexAgeMs: this.priceAgeMs,
       markAgeMs: this.priceAgeMs,

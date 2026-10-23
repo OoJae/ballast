@@ -878,14 +878,18 @@ export function createDaemon(deps: KeeperDeps): KeeperDaemon {
 
   // ---- market facts ---------------------------------------------------------------------
 
-  /** Finds our open orders on L3 by price + fingerprinted size; drops ids of ended orders. */
+  /**
+   * Finds our live orders on L3 by price + fingerprinted size; drops ids of ended orders. Every
+   * live Ballast order is matched, confirmed or not: an unconfirmed create can already rest on L3,
+   * and counting it as house liquidity would make the keeper chase its own ask.
+   */
   function attribute(mv: MarketView): void {
     const book = mv.book;
     for (const rt of accounts) {
       const live = new Set<string>();
       const expected: { key: string; price: string; size: string }[] = [];
       for (const o of rt.reconciler.orders(symbol)) {
-        if (o.side !== "sell" || o.status !== "open") continue;
+        if (o.side !== "sell" || !isLive(rt, o.clientOrderId)) continue;
         live.add(o.clientOrderId);
         if (!rt.l3Ids.has(o.clientOrderId) && o.price) {
           expected.push({ key: o.clientOrderId, price: o.price, size: decToString(o.size) });
@@ -930,9 +934,17 @@ export function createDaemon(deps: KeeperDeps): KeeperDaemon {
     return { bids: lv.bids, asks };
   }
 
+  let lastRebuildSeen: number | null = null;
+
   function globalStale(mv: MarketView): string[] {
     const out: string[] = [];
     if (!mv.l3Synced) out.push("L3 not gap-free");
+    // A gap or `clear` means the book could not be trusted for a while, however fast the rebuild:
+    // asks priced off it are cancelled once, then quoting resumes on the rebuilt book.
+    if (mv.l3RebuildAtMs !== null && mv.l3RebuildAtMs !== lastRebuildSeen) {
+      lastRebuildSeen = mv.l3RebuildAtMs;
+      out.push("L3 gap or clear: the book was rebuilt");
+    }
     if (!mv.price || mv.indexAgeMs > STALE.indexMs)
       out.push(`index/mark > 3 s (${mv.indexAgeMs} ms)`);
     if (!mv.market || mv.marketsAgeMs > STALE.marketsMs) out.push("markets > 120 s");

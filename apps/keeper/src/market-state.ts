@@ -43,6 +43,8 @@ export interface MarketView {
   book: Pick<L3Book, "bids" | "asks"> | null;
   /** The book is bootstrapped and every update since advanced the sequence by exactly 1. */
   l3Synced: boolean;
+  /** Last time the book had to be rebuilt (a gap, a `clear`, a socket loss); null if never. */
+  l3RebuildAtMs: number | null;
   price: PriceTick | null;
   indexAgeMs: number;
   markAgeMs: number;
@@ -97,6 +99,7 @@ export class LiveMarketState implements MarketSource {
   private readonly state = new Map<string, SymbolState>();
   private readonly timers: NodeJS.Timeout[] = [];
   private l3State: SocketState = "stopped";
+  private readonly rebuildAt = new Map<string, number>();
   private priceState: SocketState = "stopped";
 
   constructor(private readonly opts: LiveMarketOptions) {
@@ -125,10 +128,14 @@ export class LiveMarketState implements MarketSource {
       },
       onSnapshot: (s) => opts.onChange?.(s.symbol, "l3"),
       onRebuild: (symbol, reason, detail) => {
+        this.rebuildAt.set(symbol, this.now());
         opts.logger.warn({ symbol, reason, detail }, "l3 rebuild");
         opts.onChange?.(symbol, "l3");
       },
       onStateChange: (state, info) => {
+        if (this.l3State === "open" && state !== "open") {
+          for (const s of opts.symbols) this.rebuildAt.set(s, this.now());
+        }
         this.l3State = state;
         opts.logger.info({ state, ...info }, "l3 socket");
       },
@@ -279,6 +286,7 @@ export class LiveMarketState implements MarketSource {
       marketsAgeMs: age(st?.marketsAt),
       book,
       l3Synced: book?.synced === true && this.l3State === "open",
+      l3RebuildAtMs: this.rebuildAt.get(symbol) ?? null,
       price: st?.price ?? null,
       indexAgeMs: age(st?.price?.recvMs),
       markAgeMs: age(st?.price?.recvMs),
