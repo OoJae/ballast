@@ -30,6 +30,27 @@ importers:
         specifier: ^4.1.10
         version: 4.1.12(@types/node@26.6.5)(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(tsx@4.23.15))
 
+  apps/api:
+    dependencies:
+      '@ballast/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@ballast/evidence':
+        specifier: workspace:*
+        version: link:../../packages/evidence
+      '@ballast/market':
+        specifier: workspace:*
+        version: link:../../packages/market
+      '@ballast/strike-client':
+        specifier: workspace:*
+        version: link:../../packages/strike-client
+      pino:
+        specifier: ^10.4.0
+        version: 10.4.0
+      zod:
+        specifier: ^4.4.3
+        version: 4.6.7
+
   apps/cli:
     dependencies:
       '@ballast/market':
