@@ -100,6 +100,31 @@ describe("L3Book", () => {
     expect(b.bestBid()).toBe("0.038");
   });
 
+  it("drops updates the snapshot already contains, even after it is applied", () => {
+    // Seen live: an update still queued on the socket when the snapshot landed (2026-10-23).
+    const b = new L3Book(SYM);
+    b.applySnapshot(
+      snap(100, { asks: [{ price: "0.0386", orders: [{ order_id: "A", size: "500" }] }] }),
+    );
+    const stale = upd(95, {
+      action: "cancel",
+      order_id: "A",
+      side: "sell",
+      price: "0.0386",
+      remaining_size: "0",
+    });
+    expect(b.onUpdate(stale).ok).toBe(true);
+    expect(b.asks.get("0.0386")?.map((o) => o.id)).toEqual(["A"]);
+    expect(b.lastSequence).toBe(100);
+    expect(
+      b.onUpdate(upd(101, { order_id: "B", side: "sell", price: "0.0387", remaining_size: "1" }))
+        .ok,
+    ).toBe(true);
+    expect(
+      b.onUpdate(upd(103, { order_id: "C", side: "sell", price: "0.0388", remaining_size: "1" })),
+    ).toMatchObject({ ok: false, reason: "gap" });
+  });
+
   it("reports a gap, a clear and an unknown order", () => {
     const b = new L3Book(SYM);
     b.applySnapshot(snap(10));

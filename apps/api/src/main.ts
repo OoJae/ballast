@@ -7,6 +7,7 @@ import { createLiveSource } from "./live.js";
 import { RecordingIndex } from "./recording-index.js";
 import { createApiServer, type HolderRoutes } from "./server.js";
 import { type BookSource, ReplayBookSource } from "./sources.js";
+import { createStaticHandler } from "./static.js";
 
 /**
  * Ballast's public, read-only API. Holds no keys and makes no writes. By default every book it
@@ -66,6 +67,7 @@ const server = createApiServer({
   health,
   evidence,
   source,
+  ...(cfg.webDist ? { serveStatic: createStaticHandler(cfg.webDist) } : {}),
   onError: (err, path) =>
     log.error({ path, err: err instanceof Error ? err.message : String(err) }, "request failed"),
 });

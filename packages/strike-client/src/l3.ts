@@ -124,6 +124,10 @@ export class L3Book {
   }
 
   private apply(u: L3Update): L3Status {
+    // Sequences are per-symbol and monotone, so anything at or below lastSequence is already in
+    // the book: an update still queued on the socket when the snapshot landed. Only a jump
+    // forward is a gap.
+    if (u.sequence <= this.lastSequence) return OK;
     if (u.sequence !== this.lastSequence + 1) {
       return {
         ok: false,

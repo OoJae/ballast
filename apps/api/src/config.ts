@@ -22,6 +22,8 @@ const EnvSchema = z.object({
     .regex(/^wss?:\/\/[^/]+$/, "origin only, e.g. wss://api.strikefinance.org")
     .default("wss://api.strikefinance.org"),
   API_USER_AGENT: z.string().min(3).default("ballast-api/0.1"),
+  /** Optional: serve the built web app (apps/web/dist) from this process. */
+  WEB_DIST: z.string().min(1).optional(),
 });
 
 export interface ApiConfig {
@@ -35,6 +37,7 @@ export interface ApiConfig {
   archiveFrameMs: number;
   archiveHours: number;
   strike: { apiUrl: string; wsUrl: string; userAgent: string };
+  webDist?: string;
 }
 
 export function loadApiConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
@@ -69,5 +72,6 @@ export function loadApiConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
     archiveFrameMs: e.ARCHIVE_FRAME_MS,
     archiveHours: e.ARCHIVE_HOURS,
     strike: { apiUrl: e.STRIKE_API_URL, wsUrl: e.STRIKE_WS_URL, userAgent: e.API_USER_AGENT },
+    ...(e.WEB_DIST ? { webDist: e.WEB_DIST } : {}),
   };
 }

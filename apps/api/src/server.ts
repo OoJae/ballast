@@ -31,6 +31,8 @@ export interface ApiDeps {
   /** Concurrent SSE clients allowed (default 500). */
   maxStreams?: number;
   heartbeatMs?: number;
+  /** Serves the web app for non-/api paths (see static.ts); absent means /api only. */
+  serveStatic?: (req: IncomingMessage, res: ServerResponse, pathname: string) => boolean;
   onError?: (err: unknown, path: string) => void;
 }
 
@@ -329,6 +331,7 @@ export function createApiServer(deps: ApiDeps): Server {
       }
       return;
     }
+    if (deps.serveStatic?.(req, res, url.pathname)) return;
     sendError(req, res, 404, "not found", corsHeaders(req, deps.cors));
   };
 
