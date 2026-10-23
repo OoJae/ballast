@@ -37,10 +37,19 @@ export interface TimeChartProps {
 const toTime = (ms: number) => Math.floor(ms / 1000) as UTCTimestamp;
 
 function seriesData(l: ChartLine) {
-  return l.t.map((t, i) => {
+  const data = l.t.map((t, i) => {
     const v = l.v[i];
     return v === null || v === undefined ? { time: toTime(t) } : { time: toTime(t), value: v };
   });
+  // A little whitespace before the first point keeps the first time label from being clipped.
+  const t0 = l.t[0];
+  const t1 = l.t[1];
+  if (t0 === undefined || t1 === undefined) return data;
+  const pad = Math.max(2, Math.round(l.t.length * 0.04));
+  const lead = Array.from({ length: pad }, (_, k) => ({
+    time: toTime(t0 - (pad - k) * (t1 - t0)),
+  }));
+  return [...lead, ...data];
 }
 
 /**

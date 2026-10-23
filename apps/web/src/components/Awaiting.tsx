@@ -30,7 +30,7 @@ export function Checklist({ items }: { items: { title: string; body: ReactNode }
         <li key={i.title}>
           <CircleIcon />
           <span>
-            <b>{i.title}.</b> {i.body}
+            <b>{i.title}:</b> {i.body}
           </span>
         </li>
       ))}
