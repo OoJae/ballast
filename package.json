@@ -16,7 +16,10 @@
     "lint:fix": "biome check --write .",
     "recorder": "tsx apps/recorder/src/main.ts",
     "recorder:verify": "tsx apps/recorder/src/verify.ts",
-    "book-health": "tsx apps/cli/src/book-health.ts"
+    "book-health": "tsx apps/cli/src/book-health.ts",
+    "ballast": "tsx apps/cli/src/main.ts",
+    "verify": "tsx apps/cli/src/main.ts verify",
+    "cover": "tsx apps/cli/src/main.ts cover"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.6",
