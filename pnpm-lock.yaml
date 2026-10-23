@@ -121,7 +121,15 @@ importers:
         specifier: 8.3.5
         version: 8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(tsx@4.23.15)
 
-  packages/core: {}
+  packages/core:
+    dependencies:
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
+    devDependencies:
+      '@ballast/market':
+        specifier: workspace:*
+        version: link:../market
 
   packages/cover:
     dependencies:
@@ -135,6 +143,22 @@ importers:
       '@emurgo/cardano-serialization-lib-nodejs':
         specifier: ^17.0.0
         version: 17.0.0
+
+  packages/engine:
+    dependencies:
+      '@ballast/core':
+        specifier: workspace:*
+        version: link:../core
+      '@ballast/market':
+        specifier: workspace:*
+        version: link:../market
+      '@ballast/strike-client':
+        specifier: workspace:*
+        version: link:../strike-client
+    devDependencies:
+      '@ballast/fake-strike':
+        specifier: workspace:*
+        version: link:../fake-strike
 
   packages/evidence:
     dependencies:
@@ -176,6 +200,22 @@ importers:
         specifier: ^4.4.3
         version: 4.6.7
 
+  packages/guard:
+    dependencies:
+      '@ballast/core':
+        specifier: workspace:*
+        version: link:../core
+      '@ballast/engine':
+        specifier: workspace:*
+        version: link:../engine
+      '@ballast/strike-client':
+        specifier: workspace:*
+        version: link:../strike-client
+    devDependencies:
+      '@ballast/market':
+        specifier: workspace:*
+        version: link:../market
+
   packages/market:
     dependencies:
       '@ballast/strike-client':
@@ -184,6 +224,24 @@ importers:
       decimal.js:
         specifier: ^10.6.0
         version: 10.6.0
+
+  packages/sim:
+    dependencies:
+      '@ballast/core':
+        specifier: workspace:*
+        version: link:../core
+      '@ballast/engine':
+        specifier: workspace:*
+        version: link:../engine
+      '@ballast/guard':
+        specifier: workspace:*
+        version: link:../guard
+      '@ballast/market':
+        specifier: workspace:*
+        version: link:../market
+      '@ballast/strike-client':
+        specifier: workspace:*
+        version: link:../strike-client
 
   packages/strike-client:
     dependencies:
