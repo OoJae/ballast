@@ -114,7 +114,7 @@ function HullFigure({
         </>
       ) : null}
       {whatIf ? (
-        <text className="sl-label sl-whatif" x={0} y={bottom - 12} textAnchor="middle">
+        <text className="sl-label sl-whatif" x={-W / 2 + 4} y={top + 14}>
           what-if, computed from the replayed book
         </text>
       ) : null}

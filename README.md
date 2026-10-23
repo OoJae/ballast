@@ -2,13 +2,17 @@
 
 **Cardano holders as Strike's second market maker.**
 
-> The first market maker on Strike whose every quote is covered by coins in a Cardano wallet — checkable block by block on Koios and order by order on L3.
+> A market maker for Strike whose every quote must be covered by NIGHT in the quoting holder's own Cardano wallet: checkable block by block on Koios and order by order on L3.
 
 NIGHT holders keep their coins in Lace or Eternl as cover. A deterministic, Guard-governed keeper posts covered, post-only asks from each holder's own Strike account into the empty ask side of the NIGHT-USD book. Nothing is pooled: there is no vault, and the coins never leave the holder's wallet.
 
-**Live:** https://ballast-public-production.up.railway.app. **Judge mode** at [`/judge`](https://ballast-public-production.up.railway.app/judge) is the fastest way in. It is read-only and needs no wallet. Scrub any recorded second of the NIGHT-USD book, see the L3 sequence number it was rebuilt to, and recompute the hourly hash chain of the recordings in your own browser. The public host runs its own recorder, so its history starts at its first deploy (23 Oct 2026, 08:23 UTC). To run it locally instead, see [Run it](#run-it).
+**Live:** https://ballast-public-production.up.railway.app · **Demo film:** [ballast-demo.mp4](https://github.com/OoJae/ballast/releases/latest) (2 min, captioned) · **Brand:** [`/brand`](https://ballast-public-production.up.railway.app/brand).
 
-![The Ballast site: the replayed NIGHT-USD book, the before numbers and the depth chart](docs/screenshots/home-desktop-dark.png)
+**Judge mode** at [`/judge`](https://ballast-public-production.up.railway.app/judge) is the fastest way in. It is read-only and needs no wallet. Scrub any recorded second of the NIGHT-USD book, see the L3 sequence number it was rebuilt to, and recompute the hourly hash chain of the recordings in your own browser. The public host runs its own recorder, so its history starts at its first deploy (23 Oct 2026, 08:23 UTC). To run it locally instead, see [Run it](#run-it).
+
+![The Ballast landing page: a naval architect's body plan heeled 14.9° because NIGHT-USD has $15,596 of bids and $43 of asks within 0.5% of the mid](apps/web/public/brand/og.png)
+
+The landing page draws the book as a hull. It lists 14.9° because NIGHT-USD's bids within 0.5% of the mid outweigh its asks about 360 to 1 (ADA-USD: 3.4°). Only the reader's what-if slider rights it, and it is ticked at Ballast's real caps: one account barely moves it, and about eight level the book. The one solid object is the oxide Plimsoll disc on the hull's waterline: the brand mark, and Ballast's cover rule.
 
 ---
 
@@ -129,9 +133,9 @@ A vault's NAV is on-venue only. Depositors have to trust the venue's accounting 
 | M5 · Cardano onboarding and cover oracle | Built: CIP-30/CIP-8, Builder Connect, in-app deposit, witness merges, cover oracle. D10 (Koios cover at tip) measured binding and latency; D4, D5 and D9 wait on holder #0's funding.                                                                          |
 | M6 · Mainnet micro-tests                 | Builder code `Ballast` registered (D0). The keeper runs in DRY_RUN on mainnet data. D2, D3, D6, D7 and D8 follow D4/D5.                                                                                                                                        |
 | M7 · Holder #0 live                      | Keeper and watchdog built and chaos-tested against the fake; waits on M6.                                                                                                                                                                                      |
-| M8 · Public surfaces                     | **Live** (link above): read-only API and site on recorded data; judge mode with in-browser chain verification.                                                                                                                                                 |
+| M8 · Public surfaces                     | **Live** (link above): the "Load line" brand (tokens, logo, `/brand` guide), the landing page with the heeled-hull instrument, and every page restyled; judge mode with in-browser chain verification. Recruitment not started.                                |
 | M9 · 14-day proof                        | Not started                                                                                                                                                                                                                                                    |
-| M10 · Submission                         | In progress                                                                                                                                                                                                                                                    |
+| M10 · Submission                         | Submitted 23 Oct 2026: live site, README, docs, evidence bundle, 2-minute demo film.                                                                                                                                                                           |
 
 Dated results, with the commands that reproduce them, are in [docs/evidence/EVIDENCE.md](docs/evidence/EVIDENCE.md). Problems found along the way, including where Strike's API behaved differently from its docs, are in [FRICTION.md](FRICTION.md).
 
