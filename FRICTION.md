@@ -286,5 +286,5 @@ Dated notes on confusion, docs/API mismatches, and breakage, each with a propose
 
 ## 2026-10-23: the keeper and watchdog tests run in real time against the fake
 
-- **Cost:** the full suite went from about 34 s to about 97 s wall time. Most of it is the chaos and invariant files, which wait out real 2 s replace-batch spacing, 2 s silent-drop lookups and kill-retry windows.
-- **Fix:** give FakeStrike, the daemon and the strike-client timers one injectable clock (vitest fake timers do not reach the `ws` sockets), or split the slowest files further so they run in parallel.
+- **Cost:** the full suite went from about 34 s to about 66 s wall time (97 s before the chaos and invariant files were split so they run in parallel). These files wait out real 2 s replace-batch spacing, 2 s silent-drop lookups and kill-retry windows; the 429-storm case alone takes about 20 s.
+- **Fix:** give FakeStrike, the daemon and the strike-client timers one injectable clock (vitest fake timers do not reach the `ws` sockets).

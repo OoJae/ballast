@@ -1,9 +1,8 @@
 /**
- * Chaos at the keeper, against the fake Strike: dropped user-stream events, an L3 gap and an L3
- * `clear`, a 429 storm, a replace-batch partial reject, a cover spend mid-quote, and clock skew.
- * In every case the keeper fails closed, cancels what it must, never resends a create, and
- * recovers once the fault clears. (The keeper-crash case, which needs the watchdog, is in
- * apps/watchdog/test/chaos.test.ts.)
+ * Chaos at the keeper, against the fake Strike: dropped user-stream events, a replace-batch
+ * partial reject and a cover spend mid-quote. The keeper fails closed, never resends a create,
+ * and recovers once the fault clears. (L3 faults: chaos-l3; 429s and clock skew: chaos-limits;
+ * the keeper crash, which needs the watchdog: apps/watchdog/test/watchdog.test.ts.)
  */
 import { defaultQuotePolicy } from "@ballast/core";
 import { clientOrderId } from "@ballast/engine";
@@ -41,9 +40,6 @@ function noDuplicateCreates(x: KeeperHarness): void {
   for (const [cid, n] of x.fake.createCommands) expect(n, cid).toBe(1);
 }
 
-const cancelAlls = (x: KeeperHarness) =>
-  x.fake.requests.filter((r) => r.method === "DELETE" && r.target === "/v2/order/cancel-all");
-
 describe("chaos: dropped user-stream events", () => {
   it("a create with no events is confirmed by the REST lookup, never resent", async () => {
     const harness = await startKeeper();
@@ -65,65 +61,6 @@ describe("chaos: dropped user-stream events", () => {
     noDuplicateCreates(harness);
     expect(restingAsks(harness, id)).toHaveLength(1);
   }, 30_000);
-});
-
-describe("chaos: L3 gap and clear", () => {
-  for (const fault of ["gap", "clear"] as const) {
-    it(`an L3 ${fault} cancels resting asks while the book is rebuilt, then quoting resumes`, async () => {
-      const { h: x, id } = await quoting({ rebuildCooldownMs: 1_500 });
-      const before = cancelAlls(x).length;
-      if (fault === "gap") {
-        x.fake.market.injectL3Gap(SYMBOL);
-        x.fake.engine.restMarketOrder(SYMBOL, "buy", "0.0382", "1000");
-      } else {
-        x.fake.market.injectL3Clear(SYMBOL);
-      }
-      await vi.waitFor(() => expect(cancelAlls(x).length).toBeGreaterThan(before), wait);
-      await vi.waitFor(() => expect(restingAsks(x, id)).toEqual([]), wait);
-      const kill = x.db.decisions().find((d) => d.kind === "kill");
-      expect(kill?.guard?.decision).toBe("execute");
-      // Rebuilt: the book is gap-free again and the keeper quotes again.
-      await vi.waitFor(() => expect(restingAsks(x, id).length).toBeGreaterThan(0), wait);
-      noDuplicateCreates(x);
-    }, 40_000);
-  }
-});
-
-describe("chaos: 429 storm", () => {
-  it("three 429s pause creates for 30 s; cancels still go through", async () => {
-    const { h: x, id } = await quoting();
-    x.fake.failNext({ path: "/v2/order/replace-batch", status: 429, times: 3 });
-    const moves = ["0.03834", "0.03838", "0.03842"];
-    for (const idx of moves) {
-      x.fake.market.setPrice(SYMBOL, { mark: (Number(idx) + 0.00005).toFixed(6), index: idx });
-      await vi.waitFor(
-        () =>
-          expect(x.fake.requests.filter((r) => r.status === 429).length).toBeGreaterThan(
-            moves.indexOf(idx),
-          ),
-        wait,
-      );
-    }
-    await vi.waitFor(() => expect(x.rate.pausedUntil).toBeGreaterThan(Date.now()), wait);
-    // While paused the Guard refuses creates (rate-budget) and records the trip.
-    x.fake.market.setPrice(SYMBOL, { mark: "0.03851", index: "0.03846" });
-    await vi.waitFor(
-      () => expect(x.db.guardTrips().some((t) => t.ruleId === "rate-budget")).toBe(true),
-      wait,
-    );
-    const createsWhilePaused = x.fake.requests.filter(
-      (r) => r.target === "/v2/order/replace-batch" && r.status === 200,
-    ).length;
-    // A stale index must still cancel, pause or not.
-    x.fake.market.pricePaused.add(SYMBOL);
-    await vi.waitFor(() => expect(restingAsks(x, id)).toEqual([]), wait);
-    expect(cancelAlls(x).some((r) => r.status === 200)).toBe(true);
-    expect(
-      x.fake.requests.filter((r) => r.target === "/v2/order/replace-batch" && r.status === 200)
-        .length,
-    ).toBe(createsWhilePaused);
-    noDuplicateCreates(x);
-  }, 60_000);
 });
 
 describe("chaos: replace-batch partial reject", () => {
@@ -201,30 +138,4 @@ describe("chaos: cover spent mid-quote", () => {
     x.cover.set(id, x.accounts[0]?.label as string, 200_000n);
     await vi.waitFor(() => expect(restingAsks(x, id).length).toBeGreaterThan(0), wait);
   }, 40_000);
-});
-
-describe("chaos: clock skew", () => {
-  for (const skewMs of [200_000, -60_000]) {
-    it(`a ${skewMs > 0 ? "server-ahead" : "server-behind"} skew of ${Math.abs(skewMs) / 1000} s is resynced; nothing is resent blindly`, async () => {
-      const { h: x, id } = await quoting();
-      x.fake.skewMs = skewMs;
-      x.fake.market.setPrice(SYMBOL, { mark: "0.03845", index: "0.0384" });
-      await vi.waitFor(
-        () =>
-          expect(
-            x.fake.requests.some(
-              (r) => r.status === 401 && r.response.includes("signature expired"),
-            ),
-          ).toBe(true),
-        wait,
-      );
-      await vi.waitFor(() => expect(Math.abs(x.clock.offsetMs - skewMs)).toBeLessThan(2_000), wait);
-      // The requote lands after the resync: the ask now sits above the moved index.
-      await vi.waitFor(
-        () => expect(restingAsks(x, id).some((o) => o.price > 38_446_000_000_000_000n)).toBe(true),
-        { timeout: 20_000, interval: 50 },
-      );
-      noDuplicateCreates(x);
-    }, 40_000);
-  }
 });
