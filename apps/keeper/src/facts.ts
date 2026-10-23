@@ -128,6 +128,14 @@ export function coverSteps(m: Pick<EngineMarket, "step">, cover: CoverState | nu
   return steps(maxBigint(0n, m.step.floorUnits(`${whole}.${frac}`)));
 }
 
+/**
+ * Cover the engine and the Guard may plan against: zero while an unconfirmed spend of counted
+ * UTxOs is pending (r = 0 until a block proves the new cover, invariant 1).
+ */
+export function usableCoverSteps(m: Pick<EngineMarket, "step">, cover: CoverState | null): Steps {
+  return cover?.mempoolSpend ? steps(0n) : coverSteps(m, cover);
+}
+
 /** qty × ref in µUSD, rounded down. */
 export function refValue(ref: RefPrice, qty: Steps, m: EngineMarket): MicroUsd {
   return microUsd((ref.num * qty * m.rate.num) / (ref.den * m.rate.den));
@@ -181,7 +189,7 @@ export function buildGuardInput(request: GuardRequest, c: GuardContext): GuardIn
   const mark = decRef(m, c.mv.price?.mark);
   const p = c.policy;
   const floor = c.plan?.governor.floor ?? null;
-  const cover = coverSteps(m, c.cover);
+  const cover = usableCoverSteps(m, c.cover);
   const r = p ? effectiveRBps(c.rt.cfg.rBps, p.signed.policy) : 0n;
   const committed = committedSteps(cover, r);
   const margin = c.rt.margin;

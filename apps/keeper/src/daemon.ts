@@ -99,6 +99,7 @@ import {
   decRef,
   othersFact,
   refValue,
+  usableCoverSteps,
 } from "./facts.js";
 import type { MarketSource, MarketView } from "./market-state.js";
 
@@ -1343,7 +1344,7 @@ export function createDaemon(deps: KeeperDeps): KeeperDaemon {
       return {
         id: rt.id,
         holder0: rt.cfg.holder0,
-        coverSteps: coverSteps(m, deps.cover.view(rt.id)),
+        coverSteps: usableCoverSteps(m, deps.cover.view(rt.id)),
         rBps: rt.cfg.rBps,
         shortSteps: b?.shortSteps ?? steps(0n),
         resting: b?.resting ?? [],
