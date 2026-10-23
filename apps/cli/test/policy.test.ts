@@ -103,3 +103,46 @@ describe("ballast policy draft + sign", () => {
     expect(sign(T0)).toBe(0);
   });
 });
+
+describe("ballast policy envelope", () => {
+  it("pre-authorizes renewals of a signed policy, refusing a foreign operator or too many", () => {
+    const { kekPath, keyPath } = operatorFiles();
+    const draft = join(dir, "draft.json");
+    const outDir = join(dir, "policies");
+    expect(policyMain(["draft", "--out", draft], {}, () => T0)).toBe(0);
+    expect(
+      policyMain(
+        ["sign", "--draft", draft, "--key", keyPath, "--out-dir", outDir, "--kek", kekPath],
+        {},
+        () => T0,
+      ),
+    ).toBe(0);
+    const policyFile = join(outDir, readdirSync(outDir)[0] as string);
+    const env = (n: string, key = keyPath) =>
+      policyMain(
+        [
+          "envelope",
+          "--policy",
+          policyFile,
+          "--renewals",
+          n,
+          "--key",
+          key,
+          "--out-dir",
+          outDir,
+          "--kek",
+          kekPath,
+        ],
+        {},
+        () => T0,
+      );
+    expect(env("8")).toBe(2);
+    const other = join(dir, "other.json");
+    writeSealedKey(other, OperatorKey.generate().seal(HostKek.load(kekPath)));
+    expect(env("7", other)).toBe(2);
+    expect(env("7")).toBe(0);
+    const file = readdirSync(outDir).find((f) => f.endsWith(".envelope.json")) as string;
+    const signed = JSON.parse(readFileSync(join(outDir, file), "utf8"));
+    expect(signed.envelope.maxRenewals).toBe(7);
+  });
+});
