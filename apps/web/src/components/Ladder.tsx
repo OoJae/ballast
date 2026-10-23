@@ -23,7 +23,7 @@ const BAND = 0.005;
 
 /**
  * The book as a ladder: asks above the waterline (the reference mid), bids below, a bar per
- * level scaled to its USD, Ballast's share of a level in brass, and the ±0.5% band marked.
+ * level scaled to its USD, Ballast's share of a level in oxide red, and the ±0.5% band marked.
  */
 export function Ladder({ frame, depth = 8 }: { frame: BookFrame; depth?: number }) {
   const base = frame.symbol.split("-")[0] ?? "";

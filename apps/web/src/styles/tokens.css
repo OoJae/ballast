@@ -1,0 +1,161 @@
+/*
+ * Ballast design tokens: "Load line".
+ *
+ * The palette is a ship's hull: black topsides, a chalk load line, and red antifouling below the
+ * waterline. Oxide is the only accent. It marks the Plimsoll disc, Ballast's own orders and cover,
+ * the one primary action and the current step, and never errors, hovers or chips.
+ *
+ * Night watch (dark) is the default. Chart table (light) follows the OS unless the reader picks a
+ * theme. The two light blocks below must stay identical; apps/web/test/tokens.test.ts checks
+ * that, every contrast pair and the colour-blind separation of the series colours.
+ */
+
+/* Metric-matched fallbacks, so the webfonts swap in without moving a line (Arial and Georgia
+   measured against Archivo and Bodoni Moda; see BRAND.md). */
+@font-face {
+  font-family: "Archivo Fallback";
+  src: local("Arial"), local("Helvetica Neue"), local("Helvetica");
+  size-adjust: 98.65%;
+  ascent-override: 89%;
+  descent-override: 21.3%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: "Archivo Display Fallback";
+  src: local("Arial"), local("Helvetica Neue"), local("Helvetica");
+  size-adjust: 131.5%;
+  ascent-override: 66.8%;
+  descent-override: 16%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: "Bodoni Fallback";
+  font-style: italic;
+  src: local("Georgia Italic"), local("Georgia-Italic"), local("Times New Roman Italic");
+  size-adjust: 98.9%;
+  ascent-override: 113.8%;
+  descent-override: 40.4%;
+  line-gap-override: 0%;
+}
+
+:root,
+[data-theme="dark"] {
+  --bg: #0a0e13;
+  --bg-deep: #0e1a23;
+  --surface: #10161d;
+  --surface-2: #161d25;
+  --line: #222a33;
+  --line-strong: #6e767e;
+  --lead: #6b737c;
+  --ink: #ece6d9;
+  --ink-2: #cfc7b6;
+  --ink-3: #9ba4ac;
+  --accent-fill: #a63e27;
+  --accent-text: #e0623f;
+  --accent-press: #8e3420;
+  --on-accent: #ece6d9;
+  --bid: #5a9ad4;
+  --ask: var(--ink-2);
+  --ballast: var(--accent-fill);
+  --cf: #686f77;
+  --band: rgba(236, 230, 217, 0.05);
+  --brass: var(--ink);
+  --good: #7cc39c;
+  --bad: #d9558f;
+  --warn: var(--ink-3);
+  --focus: #ece6d9;
+  --grain: 0.045;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #eee8dc;
+    --bg-deep: #d9e6ea;
+    --surface: #f6f2ea;
+    --surface-2: #e5ded1;
+    --line: #d6cebf;
+    --line-strong: #6f777f;
+    --lead: #7a828a;
+    --ink: #0a0e13;
+    --ink-2: #2f363e;
+    --ink-3: #4e565e;
+    --accent-fill: #a23b22;
+    --accent-text: #a23b22;
+    --accent-press: #7e2c18;
+    --on-accent: #eee8dc;
+    --bid: #2563a3;
+    --ask: var(--ink-2);
+    --ballast: var(--accent-fill);
+    --cf: #7a828a;
+    --band: rgba(10, 14, 19, 0.05);
+    --brass: var(--ink);
+    --good: #185c3f;
+    --bad: #a82f70;
+    --warn: var(--ink-3);
+    --focus: #0a0e13;
+    --grain: 0;
+    color-scheme: light;
+  }
+}
+
+[data-theme="light"] {
+  --bg: #eee8dc;
+  --bg-deep: #d9e6ea;
+  --surface: #f6f2ea;
+  --surface-2: #e5ded1;
+  --line: #d6cebf;
+  --line-strong: #6f777f;
+  --lead: #7a828a;
+  --ink: #0a0e13;
+  --ink-2: #2f363e;
+  --ink-3: #4e565e;
+  --accent-fill: #a23b22;
+  --accent-text: #a23b22;
+  --accent-press: #7e2c18;
+  --on-accent: #eee8dc;
+  --bid: #2563a3;
+  --ask: var(--ink-2);
+  --ballast: var(--accent-fill);
+  --cf: #7a828a;
+  --band: rgba(10, 14, 19, 0.05);
+  --brass: var(--ink);
+  --good: #185c3f;
+  --bad: #a82f70;
+  --warn: var(--ink-3);
+  --focus: #0a0e13;
+  --grain: 0;
+  color-scheme: light;
+}
+
+/* Theme-independent tokens. */
+:root {
+  --font-display: "Archivo Variable", "Archivo Display Fallback", Arial, sans-serif;
+  --font-sans: "Archivo Variable", "Archivo Fallback", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-display);
+  --font-sounding: "Bodoni Moda Variable", "Bodoni Fallback", Georgia, serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  /* Fluid type, 375 px to 1440 px viewports. Display type is Archivo at width 112 to 125. */
+  --step-display-xl: clamp(2.5rem, 1.6rem + 4.6vw, 6.25rem);
+  --step-display-l: clamp(2rem, 1.45rem + 2.6vw, 3.75rem);
+  --step-display-m: clamp(1.5rem, 1.25rem + 1.2vw, 2.25rem);
+  --step-sounding: clamp(1.5rem, 1.15rem + 1.6vw, 2.75rem);
+  --step-sounding-xl: clamp(2.25rem, 1.4rem + 3.8vw, 4.5rem);
+  --step-body-l: clamp(1.0625rem, 1rem + 0.35vw, 1.25rem);
+  --step-body: clamp(1rem, 0.96rem + 0.18vw, 1.0625rem);
+  --step-small: 0.875rem;
+  --step-label: 0.75rem;
+
+  /* Motion: water and weight. Transform and opacity only. */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-inout: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-press: 180ms;
+  --dur-micro: 240ms;
+  --dur-reveal: 700ms;
+
+  --radius: 0;
+  --radius-sm: 0;
+  --shadow: none;
+  --header-h: 64px;
+}

@@ -1,6 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <title>Ballast</title>
-  <path d="M5 17a11 11 0 0 0 22 0z" fill="#c99a3a"/>
-  <circle cx="16" cy="16" r="10.5" fill="none" stroke="#8a94a6" stroke-width="2.5"/>
-  <rect x="1.5" y="14.75" width="29" height="2.5" rx="1.25" fill="#8a94a6"/>
+  <style>.i{fill:#0a0e13;stroke:#0a0e13}.w{fill:#a23b22}@media (prefers-color-scheme:dark){.i{fill:#ece6d9;stroke:#ece6d9}.w{fill:#c4492c}}</style>
+  <path class="w" d="M7.5 16A8.5 8.5 0 0 0 24.5 16Z"/>
+  <circle class="i" cx="16" cy="16" r="8.5" fill="none" stroke-width="3" style="fill:none"/>
+  <rect class="i" x="1" y="14.5" width="30" height="3" style="stroke:none"/>
 </svg>

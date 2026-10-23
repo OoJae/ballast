@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 24" role="img" aria-label="Ballast">
+  <title>Ballast</title>
+  <path d="M7 12A11 11 0 0 0 29 12Z" fill="#a63e27"/>
+  <circle cx="18" cy="12" r="11" fill="none" stroke="#ece6d9" stroke-width="2"/>
+  <rect x="0" y="11" width="36" height="2" fill="#ece6d9"/>
+</svg>

@@ -431,7 +431,9 @@ export function Judge() {
       <section className="section" aria-labelledby="scrub-title">
         <div className="section-head">
           <h2 id="scrub-title">Replay any recorded moment{fn("replay")}</h2>
-          <p>Ballast's orders would appear in brass; the dashed line is the book without them.</p>
+          <p>
+            Ballast's orders would appear in oxide red; the dashed line is the book without them.
+          </p>
         </div>
         <Scrubber roots={roots.data} />
       </section>

@@ -1,0 +1,97 @@
+.br-duo {
+  display: grid;
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+}
+@media (min-width: 900px) {
+  .br-duo {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.br-stage {
+  background: var(--bg);
+  color: var(--ink);
+  padding: 48px 32px;
+  display: grid;
+  place-items: center;
+}
+.br-stage > svg {
+  width: min(100%, 380px);
+  height: auto;
+}
+.br-stage.sm > svg {
+  width: 72px;
+}
+.br-marks {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+}
+.br-stage.favicon {
+  grid-auto-flow: column;
+  gap: 16px;
+  background: var(--surface);
+}
+.br-assets {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+  font-size: var(--step-small);
+}
+.br-panel {
+  background: var(--bg);
+  color: var(--ink);
+  padding: 24px;
+  display: grid;
+  gap: 14px;
+}
+.br-swatches {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.br-swatches li {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  grid-template-rows: auto auto auto;
+  column-gap: 14px;
+  align-items: center;
+}
+.br-chip {
+  grid-row: 1 / 4;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--line-strong);
+}
+.br-sw-name {
+  font-weight: 600;
+}
+.br-type {
+  display: grid;
+  gap: 28px;
+  border-top: 1px solid var(--ink);
+  padding-top: 24px;
+}
+.br-type > div {
+  display: grid;
+  gap: 8px;
+}
+.br-display {
+  font-family: var(--font-display);
+  font-stretch: 125%;
+  font-weight: 620;
+  font-size: var(--step-display-l);
+  line-height: 1;
+  letter-spacing: -0.025em;
+}
+.br-sounding {
+  font-size: var(--step-sounding-xl);
+  line-height: 1;
+}

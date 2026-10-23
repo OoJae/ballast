@@ -1,10 +1,11 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { MenuIcon, MoonIcon, SunIcon, SystemIcon } from "./components/Icons";
-import { Logo } from "./components/Logo";
-import { Home } from "./pages/Home";
+import { Lockup, Mark } from "./components/Logo";
+import { Landing } from "./pages/Landing";
 import { Link, usePath } from "./router";
 import { type ThemeChoice, useThemeChoice } from "./theme";
 
+const Book = lazy(() => import("./pages/Home").then((m) => ({ default: m.Home })));
 const BookHealth = lazy(() =>
   import("./pages/BookHealth").then((m) => ({ default: m.BookHealth })),
 );
@@ -13,20 +14,21 @@ const Conduct = lazy(() => import("./pages/Conduct").then((m) => ({ default: m.C
 const Policies = lazy(() => import("./pages/Policies").then((m) => ({ default: m.Policies })));
 const Makers = lazy(() => import("./pages/Makers").then((m) => ({ default: m.Makers })));
 const Join = lazy(() => import("./pages/Join").then((m) => ({ default: m.Join })));
+const Brand = lazy(() => import("./pages/Brand").then((m) => ({ default: m.Brand })));
 const Me = lazy(() => import("./pages/Me").then((m) => ({ default: m.Me })));
 
 const NAV = [
-  { to: "/", label: "Book" },
+  { to: "/book", label: "Book" },
   { to: "/book-health", label: "Book Health" },
   { to: "/judge", label: "Judge mode" },
   { to: "/conduct", label: "Conduct" },
   { to: "/policies", label: "Policies" },
   { to: "/makers", label: "Makers" },
-  { to: "/join", label: "Join" },
 ];
 
 const TITLES: Record<string, string> = {
   "/": "Ballast · covered liquidity for Strike",
+  "/book": "The book · Ballast",
   "/book-health": "Book Health · Ballast",
   "/judge": "Judge mode · Ballast",
   "/conduct": "Proof of Conduct · Ballast",
@@ -34,6 +36,7 @@ const TITLES: Record<string, string> = {
   "/makers": "Makers · Ballast",
   "/join": "Join · Ballast",
   "/me": "Your account · Ballast",
+  "/brand": "Brand · Ballast",
 };
 
 const NEXT_THEME: Record<ThemeChoice, ThemeChoice> = {
@@ -61,7 +64,9 @@ function ThemeButton() {
 function Page({ path }: { path: string }) {
   switch (path) {
     case "/":
-      return <Home />;
+      return <Landing />;
+    case "/book":
+      return <Book />;
     case "/book-health":
       return <BookHealth />;
     case "/judge":
@@ -76,13 +81,15 @@ function Page({ path }: { path: string }) {
       return <Join />;
     case "/me":
       return <Me />;
+    case "/brand":
+      return <Brand />;
     default:
       return (
         <div className="page-head">
-          <p className="overline">404</p>
+          <p className="overline">404 · off the chart</p>
           <h1>Nothing is moored here.</h1>
           <p className="lede">
-            That page does not exist. <Link to="/">Back to the book</Link>.
+            That page does not exist. <Link to="/">Back to the waterline</Link>.
           </p>
         </div>
       );
@@ -92,20 +99,26 @@ function Page({ path }: { path: string }) {
 export function App() {
   const path = usePath();
   const [menu, setMenu] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
     document.title = TITLES[path] ?? "Ballast";
     setMenu(false);
   }, [path]);
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
   return (
     <>
       <a className="skip" href="#main">
         Skip to content
       </a>
-      <header className="site-header">
+      <header className={`site-header${scrolled || menu || path !== "/" ? " solid" : ""}`}>
         <div className="wrap">
           <Link to="/" className="brand" aria-label="Ballast, home">
-            <Logo />
-            Ballast
+            <Lockup />
           </Link>
           <nav className="nav" aria-label="Primary">
             {NAV.map((n) => (
@@ -115,8 +128,8 @@ export function App() {
             ))}
           </nav>
           <div className="header-actions">
-            <Link to="/me" className="icon-btn account-link">
-              Account
+            <Link to="/join" className="btn primary header-join">
+              Join
             </Link>
             <ThemeButton />
             <button
@@ -141,17 +154,22 @@ export function App() {
           </nav>
         ) : null}
       </header>
-      <main id="main" className="wrap">
+      <main id="main" className={path === "/" ? "lp-main" : "wrap"}>
         <Suspense fallback={<div className="page-head" aria-busy="true" />}>
           <Page path={path} />
         </Suspense>
       </main>
       <footer className="site-footer">
         <div className="wrap">
+          <Link to="/" className="footer-mark" aria-label="Ballast, home">
+            <Mark />
+          </Link>
           <div className="footer-links">
             <Link to="/book-health#methodology">Methodology</Link>
             <Link to="/judge">Verify the recordings</Link>
             <a href="/api/health">API status</a>
+            <Link to="/brand">Brand</Link>
+            <Link to="/me">Your account</Link>
           </div>
           <p>
             Ballast reads only Strike's public market data and never publishes order ids, account

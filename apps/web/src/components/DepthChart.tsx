@@ -52,7 +52,7 @@ const niceMax = (x: number) => {
 
 /**
  * Cumulative depth within ±2% of the reference mid. The ±0.5% band is shaded: its emptiness on
- * the ask side is the problem Ballast exists to fix. Ballast's own asks would stack in brass,
+ * the ask side is the problem Ballast exists to fix. Ballast's own asks would stack in oxide red,
  * and the counterfactual (Ballast removed) is drawn dashed.
  */
 export function DepthChart({ frame }: { frame: BookFrame }) {

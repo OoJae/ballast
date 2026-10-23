@@ -1,0 +1,402 @@
+/* The landing page: a full-bleed hero instrument (the heeled body plan on its waterline), then
+   editorial sections. Above the waterline: claims. Below it, on the deep wash: evidence. */
+
+.lp-main {
+  padding-bottom: 72px;
+}
+
+.lp-hero {
+  position: relative;
+  overflow: hidden;
+  min-height: calc(100svh - var(--header-h));
+  display: grid;
+  grid-template-rows: 1fr auto;
+}
+.lp-hero-grid {
+  width: 100%;
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 24px 16px 0;
+  display: grid;
+  gap: 8px;
+  align-items: center;
+}
+@media (min-width: 720px) {
+  .lp-hero-grid {
+    padding: 32px 32px 0;
+  }
+}
+@media (min-width: 980px) {
+  .lp-hero-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+    gap: 24px;
+  }
+}
+.lp-copy {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  gap: 18px;
+  align-content: center;
+}
+.lp-copy h1 {
+  font-size: clamp(2.4rem, 1.3rem + 3.4vw, 5rem);
+  max-width: 13ch;
+  line-height: 0.98;
+  outline: none;
+}
+.lp-sub {
+  font-size: var(--step-body-l);
+  color: var(--ink-2);
+  max-width: 54ch;
+}
+.lp-copy .hero-actions {
+  margin-top: 6px;
+}
+.lp-status {
+  font-size: var(--step-label);
+  font-stretch: 118%;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* The figure. The SVG's waterline is drawn 4000 units wide so it runs full-bleed; the section
+   clips it. */
+.lp-figure {
+  margin: 0;
+  position: relative;
+  display: grid;
+  gap: 8px;
+}
+.hull-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 64svh;
+  overflow: visible;
+}
+/* Rotate about the centreline on the waterline, which is the SVG user-space origin. */
+.hull-rot {
+  transform-box: view-box;
+  transform-origin: 0 0;
+  transition: transform 900ms var(--ease-out);
+}
+.hull-sea {
+  fill: var(--bg-deep);
+}
+.hl {
+  fill: none;
+  stroke-width: 1.15;
+  vector-effect: non-scaling-stroke;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.above .hl {
+  stroke: var(--ink);
+  opacity: 0.88;
+}
+.below .hl {
+  stroke: var(--lead);
+}
+.hl-waterline {
+  stroke-dasharray: 3 4;
+  opacity: 0.55;
+}
+.above .hl-waterline {
+  opacity: 0.4;
+}
+.hl-centreline {
+  stroke-dasharray: 10 3 2 3;
+}
+.hl-dwl {
+  stroke-width: 1.6;
+}
+.sea-line {
+  stroke: var(--ink);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.hull-mark .hm-weight {
+  fill: var(--ballast);
+}
+.hull-mark .hm-ring {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 2.5;
+}
+.hull-mark .hm-bar {
+  fill: var(--ink);
+}
+.sl-label {
+  fill: var(--ink-3);
+  font-family: var(--font-sans);
+  font-size: 7.5px;
+  font-stretch: 125%;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.sl-whatif {
+  fill: var(--accent-text);
+}
+.sl-num {
+  fill: var(--ink);
+  font-size: 22px;
+}
+.lp-caption {
+  font-size: var(--step-small);
+  color: var(--ink-3);
+  max-width: 60ch;
+}
+
+/* Controls under the waterline, on the deep wash. */
+.lp-controls {
+  position: relative;
+  z-index: 2;
+  background: var(--bg-deep);
+  width: 100%;
+  border-top: 1px solid var(--ink);
+}
+.lp-controls {
+  display: grid;
+  gap: 16px;
+  padding: 18px 16px 22px;
+  align-items: center;
+}
+@media (min-width: 720px) {
+  .lp-controls {
+    padding: 20px 32px 24px;
+  }
+}
+@media (min-width: 980px) {
+  .lp-controls {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 32px;
+    padding-left: max(32px, calc((100vw - 1240px) / 2 + 32px));
+    padding-right: max(32px, calc((100vw - 1240px) / 2 + 32px));
+  }
+}
+.lp-whatif {
+  display: grid;
+  gap: 6px;
+}
+.lp-whatif input[type="range"] {
+  accent-color: var(--accent-fill);
+  min-height: 28px;
+}
+.lp-whatif-read {
+  color: var(--ink-2);
+}
+.lp-whatif-read .sounding {
+  font-size: 1.2em;
+  color: var(--ink);
+}
+.lp-replay {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--ink-3);
+  flex-wrap: wrap;
+}
+
+/* Sections */
+.lp-section {
+  width: 100%;
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 80px 16px 0;
+  display: grid;
+  gap: 28px;
+}
+@media (min-width: 720px) {
+  .lp-section {
+    padding: 112px 32px 0;
+  }
+}
+.lp-section-head {
+  display: grid;
+  gap: 12px;
+  max-width: 820px;
+}
+.lp-section-head h2 {
+  font-size: var(--step-display-l);
+}
+.lp-deep {
+  max-width: none;
+  background: var(--bg-deep);
+  border-top: 1px solid var(--ink);
+  margin-top: 112px;
+  padding-top: 56px;
+  padding-bottom: 64px;
+  padding-left: max(16px, calc((100vw - 1240px) / 2 + 32px));
+  padding-right: max(16px, calc((100vw - 1240px) / 2 + 32px));
+}
+
+/* The pipeline: a real sequence, so it is numbered. */
+.lp-rungs {
+  list-style: none;
+  counter-reset: rung;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0;
+  border-top: 1px solid var(--ink);
+}
+.lp-rungs li {
+  counter-increment: rung;
+  display: grid;
+  gap: 10px;
+  padding: 22px 0 26px;
+  border-bottom: 1px solid var(--line);
+}
+.lp-rungs li::before {
+  content: counter(rung, decimal-leading-zero);
+  font-family: var(--font-display);
+  font-stretch: 125%;
+  font-weight: 600;
+  font-size: var(--step-display-m);
+  line-height: 1;
+  color: var(--ink);
+}
+.lp-rungs li:nth-child(2)::before {
+  color: var(--accent-text);
+}
+.lp-rungs p {
+  color: var(--ink-2);
+  max-width: 62ch;
+}
+@media (min-width: 900px) {
+  .lp-rungs {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .lp-rungs li {
+    padding: 26px 24px 30px 0;
+    border-bottom: 0;
+  }
+  .lp-rungs li + li {
+    padding-left: 24px;
+    border-left: 1px solid var(--line);
+  }
+}
+
+.lp-soundings {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-top: 1px solid var(--ink);
+}
+.lp-soundings > div {
+  padding: 18px 16px 20px 0;
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+.lp-soundings dd {
+  margin: 0;
+  font-size: clamp(2rem, 1.3rem + 2.2vw, 3.4rem);
+  line-height: 1;
+  white-space: nowrap;
+}
+.lp-soundings dd .unit {
+  font-family: var(--font-sans);
+  font-style: normal;
+  font-size: var(--step-small);
+  color: var(--ink-2);
+  margin-left: 6px;
+}
+@media (min-width: 900px) {
+  .lp-soundings {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+  .lp-soundings > div {
+    border-bottom: 0;
+    padding: 22px 20px 24px 0;
+  }
+  .lp-soundings > div + div {
+    padding-left: 20px;
+    border-left: 1px solid var(--line);
+  }
+}
+
+.lp-proofs {
+  display: grid;
+  gap: 0;
+  border-top: 1px solid var(--ink);
+}
+.lp-proofs article {
+  display: grid;
+  gap: 10px;
+  padding: 22px 0 26px;
+  border-bottom: 1px solid var(--line);
+}
+.lp-proofs p {
+  color: var(--ink-2);
+}
+@media (min-width: 900px) {
+  .lp-proofs {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .lp-proofs article {
+    padding: 26px 24px 30px 0;
+    border-bottom: 0;
+  }
+  .lp-proofs article + article {
+    padding-left: 24px;
+    border-left: 1px solid var(--line);
+  }
+}
+.lp-anchor {
+  color: var(--ink-2);
+}
+
+.lp-limits {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--ink);
+  max-width: 880px;
+}
+.lp-limits li {
+  padding: 14px 0 14px 28px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-2);
+  position: relative;
+}
+.lp-limits li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 23px;
+  width: 14px;
+  height: 1px;
+  background: var(--ink-3);
+}
+
+.lp-close {
+  width: 100%;
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 120px 16px 24px;
+  display: grid;
+  gap: 18px;
+  justify-items: start;
+}
+@media (min-width: 720px) {
+  .lp-close {
+    padding: 160px 32px 24px;
+  }
+}
+.lp-close h2 {
+  font-size: var(--step-display-xl);
+  max-width: 12ch;
+  line-height: 0.98;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hull-rot {
+    transition: none;
+  }
+}
