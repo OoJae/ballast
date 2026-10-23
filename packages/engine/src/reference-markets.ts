@@ -1,0 +1,181 @@
+import type { StrikeMarketRules } from "./market.js";
+
+/**
+ * NIGHT-USD and ADA-USD rules as public `GET /v2/markets` served them on 2026-10-23 00:49 UTC.
+ * For synthetic stress scenarios and tests only: live quoting always converts the payload it was
+ * just served, every 60 s.
+ */
+export const REFERENCE_MARKETS: Readonly<Record<"NIGHT-USD" | "ADA-USD", StrikeMarketRules>> = {
+  "NIGHT-USD": {
+    symbol: "NIGHT-USD",
+    status: "trading",
+    base_prec: 8,
+    quote_prec: 8,
+    order_tick_price: "0.000001",
+    order_min_price: "0.00001",
+    order_max_price: "200",
+    order_limit_price_bound: "0.05",
+    order_limit_step_size: "1",
+    order_limit_min_size: "1",
+    order_limit_max_size: "40000000",
+    order_market_min_size: "1",
+    order_min_notional: "10",
+    impact_notional: "1000",
+    liquidation_fee_rate: "0.01",
+    liquidation_fee_retention_factor: "0.8",
+    margin_tiers: [
+      {
+        max_notional: "5000",
+        max_leverage: 10,
+        maintenance_margin_rate: "0.015",
+        maintenance_amount: "0",
+      },
+      {
+        max_notional: "10000",
+        max_leverage: 10,
+        maintenance_margin_rate: "0.025",
+        maintenance_amount: "50.000",
+      },
+      {
+        max_notional: "20000",
+        max_leverage: 10,
+        maintenance_margin_rate: "0.05",
+        maintenance_amount: "300.000",
+      },
+      {
+        max_notional: "50000",
+        max_leverage: 10,
+        maintenance_margin_rate: "0.05",
+        maintenance_amount: "300.000",
+      },
+      {
+        max_notional: "125000",
+        max_leverage: 10,
+        maintenance_margin_rate: "0.05",
+        maintenance_amount: "300.000",
+      },
+      {
+        max_notional: "250000",
+        max_leverage: 5,
+        maintenance_margin_rate: "0.1",
+        maintenance_amount: "6550.000",
+      },
+      {
+        max_notional: "500000",
+        max_leverage: 2,
+        maintenance_margin_rate: "0.1667",
+        maintenance_amount: "23225.0000",
+      },
+      {
+        max_notional: "7500000",
+        max_leverage: 1,
+        maintenance_margin_rate: "0.25",
+        maintenance_amount: "64875.0000",
+      },
+      {
+        max_notional: "10000000",
+        max_leverage: 1,
+        maintenance_margin_rate: "0.5",
+        maintenance_amount: "1939875.0000",
+      },
+    ],
+  },
+  "ADA-USD": {
+    symbol: "ADA-USD",
+    status: "trading",
+    base_prec: 8,
+    quote_prec: 8,
+    order_tick_price: "0.00001",
+    order_min_price: "0.00010",
+    order_max_price: "20000",
+    order_limit_price_bound: "0.05",
+    order_limit_step_size: "1",
+    order_limit_min_size: "1",
+    order_limit_max_size: "6000000",
+    order_market_min_size: "1",
+    order_min_notional: "10",
+    impact_notional: "2000",
+    liquidation_fee_rate: "0.01",
+    liquidation_fee_retention_factor: "0.8",
+    margin_tiers: [
+      {
+        max_notional: "10000",
+        max_leverage: 40,
+        maintenance_margin_rate: "0.005",
+        maintenance_amount: "0",
+      },
+      {
+        max_notional: "25000",
+        max_leverage: 40,
+        maintenance_margin_rate: "0.01",
+        maintenance_amount: "50.000",
+      },
+      {
+        max_notional: "50000",
+        max_leverage: 25,
+        maintenance_margin_rate: "0.01",
+        maintenance_amount: "50.000",
+      },
+      {
+        max_notional: "100000",
+        max_leverage: 20,
+        maintenance_margin_rate: "0.015",
+        maintenance_amount: "300.000",
+      },
+      {
+        max_notional: "200000",
+        max_leverage: 15,
+        maintenance_margin_rate: "0.015",
+        maintenance_amount: "300.000",
+      },
+      {
+        max_notional: "250000",
+        max_leverage: 15,
+        maintenance_margin_rate: "0.02",
+        maintenance_amount: "1300.000",
+      },
+      {
+        max_notional: "1000000",
+        max_leverage: 10,
+        maintenance_margin_rate: "0.02",
+        maintenance_amount: "1300.000",
+      },
+      {
+        max_notional: "2000000",
+        max_leverage: 5,
+        maintenance_margin_rate: "0.025",
+        maintenance_amount: "6300.000",
+      },
+      {
+        max_notional: "10000000",
+        max_leverage: 5,
+        maintenance_margin_rate: "0.05",
+        maintenance_amount: "56300.000",
+      },
+      {
+        max_notional: "20000000",
+        max_leverage: 1,
+        maintenance_margin_rate: "0.1",
+        maintenance_amount: "556300.000",
+      },
+      {
+        max_notional: "25000000",
+        max_leverage: 1,
+        maintenance_margin_rate: "0.125",
+        maintenance_amount: "1056300.000",
+      },
+      {
+        max_notional: "50000000",
+        max_leverage: 1,
+        maintenance_margin_rate: "0.25",
+        maintenance_amount: "4181300.000",
+      },
+      {
+        max_notional: "100000000",
+        max_leverage: 1,
+        maintenance_margin_rate: "0.5",
+        maintenance_amount: "16681300.000",
+      },
+    ],
+  },
+};
