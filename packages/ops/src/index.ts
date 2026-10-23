@@ -1,4 +1,12 @@
 export {
+  type Arming,
+  type ArmMode,
+  assertEligibleHost,
+  isStrikeHost,
+  parseArmArgs,
+  resolveArming,
+} from "./arming.js";
+export {
   createDeadMan,
   type DeadMan,
   type HealthReport,
@@ -28,6 +36,15 @@ export {
   signHeartbeat,
   startHeartbeatReceiver,
 } from "./heartbeat.js";
+export {
+  type Kill,
+  type KillLatency,
+  type KillProbe,
+  type KillStatus,
+  KillTracker,
+  type KillTrackerOptions,
+  latencyPercentiles,
+} from "./kill.js";
 export {
   type Alert,
   type AlertKind,
