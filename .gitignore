@@ -26,3 +26,6 @@ docs/memo-to-strike.md
 # Agent worktrees and local Claude state
 .claude/
 docs/morning-checklist.md
+
+# Voice-over recordings stay local
+*.m4a
