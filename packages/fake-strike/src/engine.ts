@@ -579,7 +579,11 @@ export class FakeEngine {
     for (const o of this.workingOrders(acct.id, symbol)) this.cancel(acct, o.id);
   }
 
-  /** replace-batch as documented: static failure → nothing; first other reject stops creates. */
+  /**
+   * replace-batch: a static failure applies nothing; any other reject stops the remaining
+   * creates, as documented, EXCEPT a post-only cross. On testnet (D1, 2026-10-23, two runs) a
+   * rejected post-only cross mid-batch did not stop the creates after it.
+   */
   replaceBatch(
     acct: FakeAccount,
     items: { cancel?: { order_id: bigint }; new_order?: CreateInput }[],
@@ -598,7 +602,10 @@ export class FakeEngine {
     for (const i of items) if (i.cancel) this.cancel(acct, i.cancel.order_id);
     for (const c of creates) {
       const r = this.create(acct, c, feeBps);
-      if (!r.ok && r.code !== "conditional_order_triggers_immediately") return;
+      const continues =
+        r.code === "conditional_order_triggers_immediately" ||
+        r.code === "order_would_match_immediately";
+      if (!r.ok && !continues) return;
     }
   }
 

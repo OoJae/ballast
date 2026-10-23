@@ -16,6 +16,7 @@ import {
   type ReplaceBatchBody,
   type SignedClient,
   StrikeApiError,
+  StrikeRefusedError,
 } from "@ballast/strike-client";
 import {
   type DayOneArgs,
@@ -40,18 +41,18 @@ export const PLAN: DayOnePlan = {
   steps: [
     "GET /v2/time ×5 and sign every request at server time − 1 s (ServerClock)",
     "GET /v2/markets and /v2/l3/snapshot for the symbol: tick, step, best bid and ask",
-    "POST /v2/orders/batch: two post-only asks ≥ 4% above the best ask, each ≈ $10.5; expect OPEN for both",
+    "POST /v2/orders/batch: two post-only asks ≥ 4% above the best ask, each at max($10.5, 1.05 × the market's minimum notional); expect OPEN for both",
     "POST /v2/order/replace-batch: cancel ask 1, create ask 3; expect CANCELED and OPEN",
     "(a) replace-batch [cancel ask 2, create an off-tick ask]: a static-rule failure",
     "(b) replace-batch [far ask, a post-only ask at the best bid (crosses), near ask] in that order",
     "(c) POST /v2/orders/batch with one item on an unknown symbol (BTCX-USD)",
     "DELETE /v2/order/cancel-all {symbol}; confirm GET /v2/openOrders is empty",
   ],
-  pass: "(a) nothing applied, no cancels (ask 2 still OPEN, the off-tick create REJECTED). (b) earlier creates rest; later ones are skipped with no event (far OPEN, crossing REJECTED, near: no event and GET /v2/order 404). (c) no event within 2 s; GET /v2/order returns 404.",
+  pass: "(a) nothing applied, no cancels (ask 2 still OPEN, the off-tick create REJECTED). (b) the post-only cross is REJECTED without sliding and does not stop the batch (far OPEN, crossing REJECTED, near OPEN), as observed on testnet 2026-10-23; the docs say later creates are skipped. (c) no event within 2 s; GET /v2/order returns 404.",
   fallback:
     "If testnet collateral can't be obtained: the same tests on mainnet BTC-USD with $10 post-only orders 4% from mid (a separate, approved run). If semantics differ: cancel + batch as two commands, counting both old and new orders as resting until events arrive.",
   exposure:
-    "testnet only; at most four resting post-only asks ≈ $10.5 each, 4-6% away from the book",
+    "testnet only; at most four resting post-only asks at the market's minimum notional + 5% each, 4-6% away from the book",
   options: {
     "--account": "testnet account id (required for --live)",
     "--key": "sealed Strike key file for that account (required for --live)",
@@ -64,12 +65,22 @@ const SYMBOL_DEFAULT = "BTC-USD";
 interface Rules {
   tick: Grid;
   step: Grid;
+  /** The market's own minimum notional (testnet BTC-USD: $100, NIGHT: $10). */
+  minNotional: number;
 }
 
-/** ≈ $10.5 at `px`: rounded up to the step. */
+/**
+ * The smallest probe the market accepts: max($10.5, 5% over its minimum notional), rounded up to
+ * the step. A fixed $10.5 was rejected on testnet BTC-USD, whose minimum is $100 (D1, 2026-10-23).
+ */
+export function probeNotional(minNotional: number): number {
+  return Math.max(10.5, minNotional * 1.05);
+}
+
 function sizeFor(rules: Rules, pxTicks: bigint): string {
   const px = rules.tick.fromUnits(pxTicks);
-  return rules.step.fromUnits(rules.step.ceilUnits(px.pow(-1).times(10.5))).toFixed();
+  const usd = probeNotional(rules.minNotional);
+  return rules.step.fromUnits(rules.step.ceilUnits(px.pow(-1).times(usd))).toFixed();
 }
 
 function ask(rules: Rules, cid: string, symbol: string, pxTicks: bigint): CreateOrderBody {
@@ -85,7 +96,7 @@ function ask(rules: Rules, cid: string, symbol: string, pxTicks: bigint): Create
 
 /** The would-send bodies for a dry run, on an illustrative BTC grid (tick 0.1, step 0.00001). */
 export function dryRunBodies(symbol = SYMBOL_DEFAULT) {
-  const rules: Rules = { tick: new Grid("0.1"), step: new Grid("0.00001") };
+  const rules: Rules = { tick: new Grid("0.1"), step: new Grid("0.00001"), minNotional: 10 };
   const best = 1_000_000n; // illustrative: best ask 100,000.0
   const at = (bps: bigint) => (best * (10_000n + bps)) / 10_000n;
   const id = (n: number) => probeId("d1", n, 0);
@@ -153,6 +164,7 @@ export async function live(ctx: LiveContext, args: DayOneArgs) {
   const rules: Rules = {
     tick: new Grid(m.order_tick_price as string),
     step: new Grid(m.order_limit_step_size as string),
+    minNotional: Number(m.order_min_notional ?? "10"),
   };
   // VERIFY: that testnet serves /v2/l3/snapshot for BTC-USD as mainnet does (FRICTION 2026-10-23).
   const snap: L3Snapshot = await ctx.reads.l3Snapshot(symbol);
@@ -200,9 +212,14 @@ export async function live(ctx: LiveContext, args: DayOneArgs) {
     replacements: [{ cancel: { order_id: a2Id, symbol }, new_order: offTick }],
   };
   let aStatus: number | string = 200;
+  // Ballast's own limiter allows one replace-batch per account per 2 s; wait it out so the
+  // command actually reaches Strike (a local refusal once made this check pass vacuously).
+  await ctx.sleep(2_500);
+  let refusedLocally = false;
   try {
     await client.write("POST", "/v2/order/replace-batch", aBody);
   } catch (err) {
+    refusedLocally = err instanceof StrikeRefusedError;
     aStatus = err instanceof StrikeApiError ? err.status : String(err);
   }
   await ctx.sleep(3_000);
@@ -212,7 +229,8 @@ export async function live(ctx: LiveContext, args: DayOneArgs) {
     httpStatus: aStatus,
     a2Canceled,
     offTickStatus,
-    ok: !a2Canceled && offTickStatus !== "OPEN",
+    ...(refusedLocally ? { untested: "refused locally before reaching Strike" } : {}),
+    ok: !refusedLocally && !a2Canceled && offTickStatus !== "OPEN",
   };
 
   // (b) a post-only cross in the middle of a batch.
@@ -231,7 +249,7 @@ export async function live(ctx: LiveContext, args: DayOneArgs) {
     crossing: crossS,
     near: nearS,
     nearLookup,
-    ok: farS === "OPEN" && crossS === "REJECTED" && nearS === null && nearLookup === 404,
+    ok: farS === "OPEN" && crossS === "REJECTED" && nearS === "OPEN" && nearLookup === 200,
   };
 
   // (c) an unknown-symbol batch item.

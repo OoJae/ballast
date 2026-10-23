@@ -132,8 +132,9 @@ pnpm exec tsx apps/cli/src/dayone/d1-testnet-semantics.ts --live --yes-i-approve
 
   Finally it cancels everything and confirms `/v2/openOrders` is empty.
 - **Pass.** (a) Nothing applied and no cancels: the first ask is still OPEN and the off-tick
-  create is REJECTED. (b) Earlier creates rest; later ones are skipped with no event: far OPEN,
-  crossing REJECTED, near with no event and `GET /v2/order` 404. (c) No event within 2 s, and
+  create is REJECTED. (b) The post-only cross is REJECTED without sliding and does **not** stop
+  the batch: far OPEN, crossing REJECTED, near OPEN. That is the behaviour observed on testnet on
+  2026-10-23 over two runs; the docs say later creates are skipped. (c) No event within 2 s, and
   `GET /v2/order` returns 404.
 - **What it proves.** The keeper's far-to-near ordering, its "unknown counts as resting" rule and
   its silent-drop detector rest on these semantics. D1 is the M1 exit gate.

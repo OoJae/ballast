@@ -52,7 +52,7 @@ describe("D1 testnet semantics", () => {
     ).rejects.toThrow(/loopback/);
   });
 
-  it("the live procedure passes against the fake, which implements the documented semantics", async () => {
+  it("the live procedure passes against the fake, which implements the observed semantics", async () => {
     rig = await dayOneRig();
     rig.fake.market.marketsPayload = { "BTC-USD": BTC_RULES };
     rig.fake.engine.restMarketOrder("BTC-USD", "buy", "99000", "1");
@@ -80,4 +80,13 @@ describe("D1 testnet semantics", () => {
     expect(r.pass).toBe(true);
     expect(rig.fake.engine.workingOrders(a.id)).toEqual([]);
   }, 60_000);
+});
+
+describe("D1 probe sizing", () => {
+  it("clears each market's own minimum notional", async () => {
+    const { probeNotional } = await import("../src/dayone/d1-testnet-semantics.js");
+    expect(probeNotional(10)).toBe(10.5);
+    expect(probeNotional(100)).toBe(105);
+    expect(probeNotional(5)).toBe(10.5);
+  });
 });

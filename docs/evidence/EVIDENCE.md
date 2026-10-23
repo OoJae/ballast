@@ -108,3 +108,23 @@ Verdict: **FAIL, for missing prerequisites; to re-run.**
 To re-run:
 - once holder #0 holds NIGHT cover (two base addresses on its stake key would also exercise the grouping test);
 - and either with an Ogmios source, or by accepting the plan's fallback of per-block Koios polling with the cancel-first path.
+
+## D1: testnet order semantics (2026-10-23, Strike testnet, BTC-USD)
+
+Verdict: **PASS.**
+- Evidence: `data/dayone/d1-live-20261023T081422Z.json`.
+- Clock: signed at `/v2/time` − 1 s; measured offset 41 ms; 0 auth errors.
+- Orders: post-only, sized at 1.05 × the market's `order_min_notional` (testnet BTC-USD is $100, not mainnet's $10).
+
+| Check                     | Result                                                                                                                                                                |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Batch create              | **pass.** Both creates came back `pending` with sequence ids, and both reached OPEN on the user stream.                                                               |
+| Replace-batch             | **pass.** The cancel and the create applied together: a1 CANCELED, a3 OPEN.                                                                                           |
+| Static-rule failure       | **pass.** An off-tick create in a replace-batch: HTTP 200, the create REJECTED, and the cancel in the same batch **not** applied (a2 still resting). Nothing applied. |
+| Post-only cross mid-batch | **pass, against observed behaviour.** Far OPEN, crossing REJECTED, near OPEN (lookup 200). The docs say a cross skips the later creates; on testnet it does not.      |
+| Unknown symbol            | **pass.** `BTCX-USD` was listed in `successful` with a sequence id, then never appeared on the stream and `GET /v2/order` returned 404: a silent drop, detected.      |
+| Cleanup                   | **pass.** `/v2/openOrders` empty afterwards.                                                                                                                          |
+
+What changed because of D1:
+- The fake Strike and the replace-batch tests now model the observed cross behaviour: a post-only reject does not stop later creates.
+- The engine never relies on the documented skip. Every create in a batch is sized and floored on its own, so either behaviour is safe.

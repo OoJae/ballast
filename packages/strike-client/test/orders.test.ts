@@ -247,7 +247,7 @@ describe("fake Strike semantics, driven through the signed client", () => {
     });
   });
 
-  it("replace-batch: a post-only cross is rejected without sliding and stops later creates", async () => {
+  it("replace-batch: a post-only cross is rejected without sliding and later creates still rest (observed on testnet)", async () => {
     h = await h_with_bid();
     const far = ask("0.0395");
     const crossing = ask("0.0389"); // the scripted bid sits at 0.0390
@@ -264,13 +264,9 @@ describe("fake Strike semantics, driven through the signed client", () => {
       price: 38_900_000_000_000_000n,
       filled: 0n,
     });
-    expect(statusOf(h, after.client_order_id)).toBeUndefined();
-    await expect(
-      h.client.getOrder(SYMBOL, { clientOrderId: after.client_order_id }),
-    ).rejects.toMatchObject({
-      status: 404,
-      code: "order not found",
-    });
+    // Strike's docs say the first reject stops the remaining creates; testnet (D1, 2026-10-23)
+    // showed a post-only cross does not.
+    expect(statusOf(h, after.client_order_id)).toBe("open");
   });
 
   async function h_with_bid(): Promise<Harness> {

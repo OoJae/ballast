@@ -326,3 +326,10 @@ Dated notes on confusion, docs/API mismatches, and breakage, each with a propose
 - **Fix:** on start, read the evidence DB's unresolved creates for each account and feed them to PendingCreates before the first tick, so silent-drop lookups resume.
 - **Watchdog kills are not signed decision records:** host B holds no daemon signing key (by design, CANCEL_ONLY), so its kills go to its own `kills` JSONL and SQLite table, with latency, and not into the keeper's hash chain. `ballast verify` therefore does not see them.
 - **Fix:** give the watchdog its own signing domain (`ballast/watchdog/v1`) and key, append its kills to a separate chain, and teach verify to merge both chains by time.
+
+## 2026-10-23: D1 on testnet: three API behaviours that differ from the docs or from mainnet
+
+- **A post-only cross does not stop later creates.** In a replace-batch ordered far to near, the crossing create was REJECTED (`order_would_match_immediately`) and the next, nearer create still rested (seen in 2 runs). The skill docs say later creates are skipped. Ballast does not depend on either behaviour, but anyone relying on the documented skip as a safety stop would be wrong. Asked in the memo.
+- **Testnet BTC-USD has a $100 minimum notional** (`order_min_notional`), against $10 on mainnet NIGHT. The first D1 run had every create REJECTED at $10.50. The probe size now comes from the market's own rule (1.05 × minimum).
+- **Our own limiter refused D1's check (a) locally.** The client allows one replace-batch per account per 2 s, and the probe sent its first replace-batch right after the setup batch. Fix: D1 waits 2.5 s, and a check that never reached Strike is reported as untested, never as a pass or fail.
+- **An unknown symbol is accepted, then silently dropped.** `BTCX-USD` came back in `successful` with a sequence id and then 404'd. This confirms the silent-drop detector is needed for every create, not just for rate-limited ones.
