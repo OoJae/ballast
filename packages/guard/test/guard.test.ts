@@ -341,7 +341,7 @@ describe("prices", () => {
         },
       },
     };
-    expect(violation(checkGuard(dup), "ladder-shape").detail).toContain("more than one ask");
+    expect(violation(checkGuard(dup), "ladder-shape").detail).toContain("is not above L1");
   });
 
   it("no-bid-ahead: every buy is reduce-only and strictly below the best non-Ballast bid", () => {
@@ -585,9 +585,13 @@ describe("conduct rules", () => {
       withCreate((c) => (c.client_order_id = id({ seq: SEQ + 1n }))),
       "client-id-format",
     );
-    // Level 2 for the cheapest ask: also outside the allocation (blind mode allocates L1 only).
+    // The level is the ladder's, checked against the allocation (blind mode allocates L1 only).
+    blockedOnlyBy(
+      withCreate((c) => (c.client_order_id = id({ level: 2 }))),
+      "allocator-conformance",
+    );
     violation(
-      checkGuard(withCreate((c) => (c.client_order_id = id({ level: 2 })))),
+      checkGuard(withCreate((c) => (c.client_order_id = id({ level: "x" })))),
       "client-id-format",
     );
     blockedOnlyBy(

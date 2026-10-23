@@ -18,6 +18,7 @@ import {
   maxBigint,
   microUsd,
   minBigint,
+  minusBpsFloor,
   notionalCeil,
   plusBpsCeil,
   policyMoney,
@@ -77,6 +78,8 @@ interface Legs {
   creates: CreateLeg[];
   cancels: Set<bigint>;
   cancelAll: boolean;
+  /** POST /v2/leverage or /v2/marginMode: account settings the leverage cap rests on. */
+  config: { kind: "leverage" | "margin-mode"; symbol: unknown; value: unknown } | null;
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -107,9 +110,14 @@ function orderIdOf(v: unknown): bigint | null {
 
 /** The request's legs, read from its body by path (also when the route itself is refused). */
 function legsOf(path: string, body: unknown): Legs {
-  const legs: Legs = { creates: [], cancels: new Set(), cancelAll: false };
+  const legs: Legs = { creates: [], cancels: new Set(), cancelAll: false, config: null };
   const p = path.split("?")[0];
   if (!isRecord(body)) return legs;
+  if (p === "/v2/leverage") {
+    legs.config = { kind: "leverage", symbol: body.symbol, value: body.leverage };
+  } else if (p === "/v2/marginMode") {
+    legs.config = { kind: "margin-mode", symbol: body.symbol, value: body.marginMode };
+  }
   if (p === "/v2/order/replace-batch" && Array.isArray(body.replacements)) {
     for (const item of body.replacements) {
       if (!isRecord(item)) continue;
@@ -216,6 +224,8 @@ interface Ask {
   clientOrderId: string;
   px: Ticks;
   qty: Steps;
+  /** The ladder level its client id carries; null for an id that does not parse. */
+  level: number | null;
 }
 
 interface Derived {
@@ -226,10 +236,21 @@ interface Derived {
   /** The account's asks after this request, cheapest first. */
   asks: Ask[];
   askQty: bigint;
+  /** Resting and new asks at their prices. */
   askUsd: bigint;
+  /**
+   * Unconfirmed creates, whose prices this fact does not carry, valued at the dearest price
+   * Strike would admit (mark × (1 + its band)); null without a mark while any are pending.
+   */
+  pendingUsd: bigint | null;
   /** short at mark; null without a mark. */
   shortUsd: bigint | null;
 }
+
+const levelOf = (clientOrderId: string): number | null => {
+  const l = parseClientOrderId(clientOrderId)?.level;
+  return l === undefined || l === "x" ? null : l;
+};
 
 function derive(input: GuardInput): Derived {
   const { request, account: acct, market } = input;
@@ -244,12 +265,30 @@ function derive(input: GuardInput): Derived {
   }));
   const newAsks = validated
     .filter((x) => x.leg.side === "sell")
-    .map((x) => ({ clientOrderId: x.leg.clientOrderId, px: x.v.px, qty: x.v.qty }));
+    .map((x) => ({
+      clientOrderId: x.leg.clientOrderId,
+      px: x.v.px,
+      qty: x.v.qty,
+      level: levelOf(x.leg.clientOrderId),
+    }));
   const kept = acct.resting
     .filter((r) => !legs.cancelAll && (r.orderId === null || !legs.cancels.has(r.orderId)))
-    .map((r) => ({ clientOrderId: r.clientOrderId, px: r.px, qty: r.qty }));
+    .map((r) => ({
+      clientOrderId: r.clientOrderId,
+      px: r.px,
+      qty: r.qty,
+      level: levelOf(r.clientOrderId),
+    }));
   const asks = [...kept, ...newAsks].sort((a, b) => (a.px < b.px ? -1 : a.px > b.px ? 1 : 0));
   const rate = market.spec.rate;
+  const mark = market.mark;
+  const pending = acct.pendingSteps;
+  const pendingUsd =
+    pending === 0n
+      ? 0n
+      : mark
+        ? notionalCeil(refPlusBpsCeil(mark, market.spec.strikePriceBoundBps), pending, rate)
+        : null;
   return {
     legs,
     validated,
@@ -258,7 +297,8 @@ function derive(input: GuardInput): Derived {
     asks,
     askQty: asks.reduce((s, a) => s + a.qty, 0n),
     askUsd: asks.reduce((s, a) => s + notionalCeil(a.px, a.qty, rate), 0n),
-    shortUsd: market.mark ? refNotionalCeil(market.mark, acct.shortSteps, rate) : null,
+    pendingUsd,
+    shortUsd: mark ? refNotionalCeil(mark, acct.shortSteps, rate) : null,
   };
 }
 
@@ -341,6 +381,9 @@ function quotingRules(
       if (!market.arm.armed) problems.push(`not armed: ${market.arm.reason}`);
       for (const c of d.legs.creates) {
         if (c.symbol !== symbol) problems.push(`create on ${c.symbol || "(none)"}`);
+      }
+      if (d.legs.config && d.legs.config.symbol !== symbol) {
+        problems.push(`${d.legs.config.kind} on ${String(d.legs.config.symbol)}`);
       }
       return problems.length === 0
         ? [true, `${symbol} allowed and armed`]
@@ -464,7 +507,8 @@ function quotingRules(
         if (x.fragileLong !== false) problems.push("a fragile long exists: P2-blind stands down");
         let cap: bigint = minBigint(P2_BLIND_CAP, x.capMicroUsd);
         if (p) cap = minBigint(cap, policyMoney(p).preD6DepthCap);
-        const total = market.others.askMicroUsd + d.askUsd;
+        if (d.pendingUsd === null) problems.push("unconfirmed creates and no mark to value them");
+        const total = market.others.askMicroUsd + d.askUsd + (d.pendingUsd ?? 0n);
         if (total > cap) problems.push(`Ballast asks ${total} µUSD > P2-blind cap ${cap}`);
         const floor = market.floor?.ticks ?? null;
         const markTicks = mark ? refCeil(mark) : null;
@@ -477,8 +521,9 @@ function quotingRules(
         if (minAsk !== null && minAsk < x.minL1Ticks) {
           problems.push(`L1 ${minAsk} < P2-safe L1 ${x.minL1Ticks}`);
         }
+        // Unconfirmed creates may sit at L1: they count there.
         const atL1 = d.asks.filter((a) => a.px === minAsk).reduce((s, a) => s + a.qty, 0n);
-        const total = market.others.l1Steps + atL1;
+        const total = market.others.l1Steps + atL1 + acct.pendingSteps;
         if (total > x.maxL1DepthSteps) {
           problems.push(`L1 depth ${total} > P2-safe ${x.maxL1DepthSteps} steps`);
         }
@@ -493,23 +538,47 @@ function quotingRules(
     withD((d) => {
       const problems: string[] = [];
       const maxLevels = Math.min(p?.pricing.maxLevels ?? 0, caps.maxLevels);
-      const prices = new Set(d.asks.map((a) => a.px));
       if (d.asks.length > maxLevels) problems.push(`${d.asks.length} asks > ${maxLevels} levels`);
-      if (prices.size !== d.asks.length) problems.push("more than one ask at a level");
+      // Levels are the ladder's (the allocator's), carried in each client id: an account may
+      // hold L2 without L1. One order per level, prices rising with the level.
+      const byLevel = new Map<number, Ask>();
+      for (const a of d.asks) {
+        if (a.level === null || a.level < 1 || a.level > maxLevels) {
+          problems.push(`${a.clientOrderId} has no ladder level within 1..${maxLevels}`);
+        } else if (byLevel.has(a.level)) problems.push(`more than one ask at L${a.level}`);
+        else byLevel.set(a.level, a);
+      }
+      const levels = [...byLevel.entries()].sort((x, y) => x[0] - y[0]);
+      for (let i = 1; i < levels.length; i++) {
+        const [lo, a] = levels[i - 1] as [number, Ask];
+        const [hi, b] = levels[i] as [number, Ask];
+        if (b.px <= a.px) problems.push(`L${hi} ${b.px} is not above L${lo} ${a.px}`);
+      }
       const rations = p ? policyRations(policyMoney(p).l1Refill) : [...LEVEL_RATIONS];
-      const l1 = d.asks[0]?.px;
-      for (const [i, a] of d.asks.entries()) {
-        if (i > 0 && l1 !== undefined) {
-          const spacing = p?.pricing.levelSpacingBps[i - 1];
-          if (spacing === undefined) problems.push(`L${i + 1} has no spacing`);
-          else if (a.px < plusBpsCeil(l1, BigInt(spacing))) {
-            problems.push(`L${i + 1} ${a.px} < L1 + ${spacing} bps`);
+      const l1 = byLevel.get(1);
+      for (const [level, a] of levels) {
+        if (l1 && level > 1) {
+          const spacing = p?.pricing.levelSpacingBps[level - 2];
+          if (spacing === undefined) problems.push(`L${level} has no spacing`);
+          else if (a.px < plusBpsCeil(l1.px, BigInt(spacing))) {
+            problems.push(`L${level} ${a.px} < L1 + ${spacing} bps`);
           }
         }
-        const ration = rations[i];
+        const ration = rations[level - 1];
         const usd = notionalCeil(a.px, a.qty, rate);
         if (ration === undefined || usd > ration) {
-          problems.push(`L${i + 1} ${usd} µUSD > ration ${ration ?? "(none)"}`);
+          problems.push(`L${level} ${usd} µUSD > ration ${ration ?? "(none)"}`);
+        }
+      }
+      // Arm only while a new L1 improves the best non-Ballast ask by minImprovement.
+      if (d.newAsks.length > 0) {
+        const bestAsk = market.bestAskTicks;
+        const improve = BigInt(p?.pricing.minImprovementBps ?? 5);
+        if (bestAsk === null) problems.push("no non-Ballast ask to improve on");
+        for (const a of d.newAsks) {
+          if (a.level === 1 && bestAsk !== null && a.px > minusBpsFloor(bestAsk, improve)) {
+            problems.push(`L1 ${a.px} does not improve the best ask ${bestAsk} by ${improve} bps`);
+          }
         }
       }
       return problems.length === 0
@@ -567,14 +636,31 @@ function quotingRules(
     "leverage-cap",
     withD((d) => {
       const cap = minBigint(BigInt(p?.risk.maxLeverageX100 ?? 0), caps.maxLeverageX100);
+      // Strike's own admission at symbol leverage ≤ cap, cross margin, is the cap's second
+      // layer: the keeper may set it, never loosen it.
+      const cfg = d.legs.config;
+      if (cfg?.kind === "leverage") {
+        const v = cfg.value;
+        const ok =
+          typeof v === "number" && Number.isSafeInteger(v) && v >= 1 && BigInt(v) * 100n <= cap;
+        return [ok, `symbol leverage ${String(v)} vs cap ${cap}/100`];
+      }
+      if (cfg?.kind === "margin-mode") {
+        return [cfg.value === "cross", `margin mode ${String(cfg.value)}; Ballast runs cross`];
+      }
       if (!mark || d.shortUsd === null) return [false, "no mark to value the position"];
-      // Resting asks count at the worse of their price and the mark.
-      let usd = d.shortUsd;
+      if (d.pendingUsd === null) return [false, "unconfirmed creates and no mark to value them"];
+      // Resting asks count at the worse of their price and the mark; unconfirmed creates at the
+      // dearest price Strike would admit.
+      let usd = d.shortUsd + d.pendingUsd;
       for (const a of d.asks) {
         usd += maxBigint(notionalCeil(a.px, a.qty, rate), refNotionalCeil(mark, a.qty, rate));
       }
       const ok = acct.equityMicroUsd > 0n && usd * 100n <= acct.equityMicroUsd * cap;
-      return [ok, `(short + asks) ${usd} µUSD vs equity ${acct.equityMicroUsd} at ≤ ${cap}/100`];
+      return [
+        ok,
+        `(short + asks + pending) ${usd} µUSD vs equity ${acct.equityMicroUsd} at ≤ ${cap}/100`,
+      ];
     }),
   );
   rule("margin-band", () => {
@@ -593,12 +679,13 @@ function quotingRules(
       let cap: bigint = p ? policyMoney(p).perAccountMaxShort : 0n;
       if (acct.maxShortMicroUsd !== null) cap = minBigint(cap, acct.maxShortMicroUsd);
       if (acct.holder0) cap = minBigint(cap, caps.holder0MaxShort);
-      if (d.shortUsd === null) return [false, "no mark to value the short"];
-      const usd = d.shortUsd + d.askUsd;
+      if (d.shortUsd === null || d.pendingUsd === null)
+        return [false, "no mark to value the short"];
+      const usd = d.shortUsd + d.askUsd + d.pendingUsd;
       const qty = acct.shortSteps + d.askQty + acct.pendingSteps;
       return [
         usd <= cap && qty <= committed,
-        `short + asks ${usd} µUSD ≤ ${cap}; ${qty} ≤ r × cover ${committed}`,
+        `short + asks + pending ${usd} µUSD ≤ ${cap}; ${qty} ≤ r × cover ${committed}`,
       ];
     }),
   );
@@ -606,8 +693,9 @@ function quotingRules(
     "aggregate-cap",
     withD((d) => {
       const cap = minBigint(p ? policyMoney(p).aggregateMaxShort : 0n, market.exitDepthMicroUsd);
-      if (d.shortUsd === null) return [false, "no mark to value the short"];
-      const total = market.others.exposureMicroUsd + d.shortUsd + d.askUsd;
+      if (d.shortUsd === null || d.pendingUsd === null)
+        return [false, "no mark to value the short"];
+      const total = market.others.exposureMicroUsd + d.shortUsd + d.askUsd + d.pendingUsd;
       return [total <= cap, `Σ short + asks ${total} µUSD ≤ min(policy, exit depth) ${cap}`];
     }),
   );
@@ -710,9 +798,10 @@ function quotingRules(
       const problems: string[] = [];
       const want = input.policy ? policyTag(input.policy.hash) : null;
       const acct6 = accountTag(acct.id);
-      const ranks = [...new Set(d.asks.map((a) => a.px))];
       const seen = new Set<string>();
-      for (const { leg: c, v } of d.validated) {
+      // An entry's level is the ladder level it was allocated at (ladder-shape and
+      // allocator-conformance check it against prices and the allocation); exits are "x".
+      for (const { leg: c } of d.validated) {
         const id = c.clientOrderId;
         const parts = parseClientOrderId(id);
         if (!parts) {
@@ -723,8 +812,7 @@ function quotingRules(
         if (parts.acct6 !== acct6) problems.push(`${id}: not this account`);
         if (parts.seq !== input.decisionSeq) problems.push(`${id}: seq ≠ ${input.decisionSeq}`);
         if (c.side === "sell" && !c.reduceOnly) {
-          const rank = ranks.indexOf(v.px) + 1;
-          if (parts.level !== rank) problems.push(`${id}: level ≠ ladder rank ${rank}`);
+          if (parts.level === "x") problems.push(`${id}: entries carry a ladder level`);
         } else if (parts.level !== "x") problems.push(`${id}: exits use level x`);
         if (input.usedClientOrderIds.has(id) || seen.has(id)) problems.push(`${id} is reused`);
         seen.add(id);
