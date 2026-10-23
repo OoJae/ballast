@@ -22,6 +22,7 @@ export {
   type CoverConfig,
   DEFAULT_R_BPS,
   KOIOS_MAINNET_URL,
+  KOIOS_PREPROD_URL,
   loadCoverConfig,
   MAX_R_BPS,
   NIGHT,

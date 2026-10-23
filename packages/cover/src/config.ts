@@ -24,6 +24,7 @@ export const MAX_R_BPS = 9000;
 export const COVER_MAX_AGE_MS = 60_000;
 
 export const KOIOS_MAINNET_URL = "https://api.koios.rest/api/v1";
+export const KOIOS_PREPROD_URL = "https://preprod.koios.rest/api/v1";
 export const USER_AGENT = "ballast-cover/0.1 (read-only cover oracle)";
 
 const emptyToUndefined = (v: unknown) => (typeof v === "string" && v.trim() === "" ? undefined : v);

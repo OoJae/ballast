@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
-import { KoiosClient, type KoiosReader, loadCoverConfig } from "@ballast/cover";
+import { KOIOS_PREPROD_URL, KoiosClient, type KoiosReader, loadCoverConfig } from "@ballast/cover";
 import { MANIFEST, type ManifestEntry } from "@ballast/evidence";
 import { koiosAnchorLookup, renderVerifyTable, runVerify, type VerifyOptions } from "./verify.js";
 
@@ -87,6 +87,17 @@ function recordingsManifest(root: string): Map<string, string> {
   return map;
 }
 
+function bundleNetwork(dir: string): string | null {
+  try {
+    return (
+      (JSON.parse(readFileSync(join(dir, "manifest.json"), "utf8")) as { network?: string })
+        .network ?? null
+    );
+  } catch {
+    return null;
+  }
+}
+
 export interface VerifyDeps {
   koios?: KoiosReader;
   out?: (s: string) => void;
@@ -96,13 +107,17 @@ export interface VerifyDeps {
 export async function verifyMain(argv: readonly string[], deps: VerifyDeps = {}): Promise<number> {
   const a = parseVerifyArgs(argv);
   const out = deps.out ?? ((s: string) => void process.stdout.write(s));
-  const cfg = loadCoverConfig(deps.env ?? process.env);
+  const env = deps.env ?? process.env;
+  const cfg = loadCoverConfig(env);
+  // A preprod bundle's anchors live on preprod: follow the bundle unless KOIOS_URL says otherwise.
+  const koiosUrl =
+    !env.KOIOS_URL && bundleNetwork(a.bundle) === "preprod" ? KOIOS_PREPROD_URL : cfg.koiosUrl;
   const koios =
     deps.koios ??
     (a.offline
       ? null
       : new KoiosClient({
-          baseUrl: cfg.koiosUrl,
+          baseUrl: koiosUrl,
           ...(cfg.koiosToken ? { token: cfg.koiosToken } : {}),
         }));
   const opts: VerifyOptions = {

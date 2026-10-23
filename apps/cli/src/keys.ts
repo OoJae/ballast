@@ -1,23 +1,36 @@
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { AnchorWalletKey, HostKek, StrikeKey, writeSealedKey } from "@ballast/governance";
+import {
+  AnchorWalletKey,
+  DaemonKey,
+  HostKek,
+  OperatorKey,
+  StrikeKey,
+  writeSealedKey,
+} from "@ballast/governance";
 import * as CSL from "@emurgo/cardano-serialization-lib-nodejs";
 
 export const DEFAULT_KEK_PATH = join(homedir(), ".ballast", "host.kek");
 
 const USAGE = `usage: ballast keys new-strike --out <file> [--kek <path>]
        ballast keys new-anchor --network <preprod|mainnet> --out <file> [--kek <path>]
+       ballast keys new-operator --out <file> [--kek <path>]
+       ballast keys new-daemon --out <file> [--kek <path>]
   Generates an Ed25519 Strike API-wallet key, seals it under the host KEK (created with mode
   0600 if missing; default ${DEFAULT_KEK_PATH} or $BALLAST_KEK_PATH) and prints ONLY the public key.
   Register that public key on the Strike app's API Wallets page. The private key never leaves the
   sealed file. new-anchor seals a CIP-20 anchor wallet key the same way and prints its enterprise
-  address, to fund from a faucet (preprod) or with at most 20 ADA (mainnet).`;
+  address, to fund from a faucet (preprod) or with at most 20 ADA (mainnet). new-operator seals
+  the policy-signing key (its public key goes in BALLAST_OPERATOR_PUBKEYS); new-daemon seals the
+  keeper's decision-signing key (its public key is what verifiers and the watchdog trust).`;
+
+const SUBCOMMANDS = ["new-strike", "new-anchor", "new-operator", "new-daemon"] as const;
 
 /** `ballast keys new-strike`: an API wallet for day-one tests, sealed at rest (invariant 25). */
 export function keysMain(args: readonly string[], env = process.env): number {
   const [sub, ...rest] = args;
-  if (sub !== "new-strike" && sub !== "new-anchor") {
+  if (!(SUBCOMMANDS as readonly (string | undefined)[]).includes(sub)) {
     console.error(USAGE);
     return 2;
   }
@@ -48,6 +61,18 @@ export function keysMain(args: readonly string[], env = process.env): number {
     writeSealedKey(out, key.seal(kek));
     console.log(
       `${kekNote}sealed anchor key: ${out}\n${network} address: ${anchorAddress(key, network)}`,
+    );
+    return 0;
+  }
+  if (sub === "new-operator" || sub === "new-daemon") {
+    const key = sub === "new-operator" ? OperatorKey.generate() : DaemonKey.generate();
+    writeSealedKey(out, key.seal(kek));
+    const use =
+      sub === "new-operator"
+        ? "add to BALLAST_OPERATOR_PUBKEYS"
+        : "pass to verify as --daemon-pubkey";
+    console.log(
+      `${kekNote}sealed ${key.role} key: ${out}\npublic key (${use}): ${key.publicKeyHex}`,
     );
     return 0;
   }

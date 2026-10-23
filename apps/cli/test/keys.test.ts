@@ -65,3 +65,21 @@ describe("ballast keys new-anchor", () => {
     expect(keysMain(["new-anchor", "--out", join(dir, "a.json"), "--kek", join(dir, "k")])).toBe(2);
   });
 });
+
+describe("ballast keys new-operator / new-daemon", () => {
+  it.each([
+    ["new-operator", "operator"],
+    ["new-daemon", "daemon"],
+  ] as const)("%s seals a %s key and prints only its public key", (sub, role) => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const kek = join(dir, "host.kek");
+    const out = join(dir, `${role}.json`);
+    expect(keysMain([sub, "--out", out, "--kek", kek])).toBe(0);
+    const sealed = readSealedKey(out);
+    expect(sealed.role).toBe(role);
+    const key = openSealedKey(sealed, HostKek.load(kek), role);
+    const printed = log.mock.calls.flat().join("\n");
+    expect(printed).toContain(key.publicKeyHex);
+    expect(printed).not.toContain(sealed.ct);
+  });
+});
