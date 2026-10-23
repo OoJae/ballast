@@ -589,6 +589,9 @@ export function openEvidenceDb(path: string) {
     activeWallet: db.prepare(
       "SELECT * FROM holder_wallets WHERE account_id = ? AND status = 'active'",
     ),
+    wallets: db.prepare(
+      "SELECT * FROM holder_wallets WHERE account_id = ? ORDER BY created_at_ms, rowid",
+    ),
     insertConsent: db.prepare(
       `INSERT INTO holder_consents (hash, account_id, stake_cred, r_bps, max_short_base, fee_share_bps,
          signature_hash, signed_at_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -638,6 +641,16 @@ export function openEvidenceDb(path: string) {
       return { acquired: false, holderPid: row.pid, heartbeatAgeMs };
     },
   );
+
+  const mapWallet = (r: Record<string, unknown>): HolderWalletRow => ({
+    publicKey: r.public_key as string,
+    accountId: r.account_id as string,
+    address: r.address as string,
+    keyPath: r.key_path as string,
+    status: r.status as HolderWalletRow["status"],
+    createdAtMs: r.created_at_ms as number,
+    revokedAtMs: (r.revoked_at_ms as number | null) ?? null,
+  });
 
   const rotateWalletTxn = db.transaction((w: Omit<HolderWalletRow, "status" | "revokedAtMs">) => {
     st.revokeWallets.run(w.createdAtMs, w.accountId);
@@ -1036,17 +1049,11 @@ export function openEvidenceDb(path: string) {
     },
     activeHolderWallet(accountId: string): HolderWalletRow | null {
       const r = st.activeWallet.get(accountId) as Record<string, unknown> | undefined;
-      return r
-        ? {
-            publicKey: r.public_key as string,
-            accountId: r.account_id as string,
-            address: r.address as string,
-            keyPath: r.key_path as string,
-            status: r.status as "active",
-            createdAtMs: r.created_at_ms as number,
-            revokedAtMs: null,
-          }
-        : null;
+      return r ? mapWallet(r) : null;
+    },
+    /** Every API wallet the account has had, oldest first (revoked ones included). */
+    holderWallets(accountId: string): HolderWalletRow[] {
+      return (st.wallets.all(accountId) as Record<string, unknown>[]).map(mapWallet);
     },
 
     /** Stores a signed consent's hash and applies its r to the account, atomically. */

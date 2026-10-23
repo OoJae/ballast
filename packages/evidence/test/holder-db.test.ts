@@ -51,6 +51,10 @@ describe("holder onboarding rows", () => {
       createdAtMs: T0 + 1,
     });
     expect(db.activeHolderWallet("acct-1")).toMatchObject({ publicKey: H("2"), status: "active" });
+    expect(db.holderWallets("acct-1").map((w) => [w.publicKey, w.status, w.revokedAtMs])).toEqual([
+      [H("1"), "revoked", T0 + 1],
+      [H("2"), "active", null],
+    ]);
     expect(() =>
       db.rotateHolderWallet({
         publicKey: H("2"),

@@ -66,6 +66,9 @@ importers:
 
   apps/cli:
     dependencies:
+      '@ballast/cardano':
+        specifier: workspace:*
+        version: link:../../packages/cardano
       '@ballast/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -84,6 +87,10 @@ importers:
       '@ballast/strike-client':
         specifier: workspace:*
         version: link:../../packages/strike-client
+    devDependencies:
+      '@ballast/fake-strike':
+        specifier: workspace:*
+        version: link:../../packages/fake-strike
 
   apps/recorder:
     dependencies:

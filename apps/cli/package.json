@@ -4,11 +4,15 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@ballast/cardano": "workspace:*",
     "@ballast/core": "workspace:*",
     "@ballast/cover": "workspace:*",
     "@ballast/evidence": "workspace:*",
     "@ballast/governance": "workspace:*",
     "@ballast/market": "workspace:*",
     "@ballast/strike-client": "workspace:*"
+  },
+  "devDependencies": {
+    "@ballast/fake-strike": "workspace:*"
   }
 }

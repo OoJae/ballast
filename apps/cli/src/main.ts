@@ -3,13 +3,16 @@
  *   verify       re-check an evidence bundle (chain, signatures, policies, anchors, cover)
  *   cover        read-only Proof of Cover for an addr1… or stake1… at the current tip
  *   book-health  "before" Book Health from local recordings (same as `pnpm book-health`)
+ *   dayone       D4/D5/D9 day-one checks that need a browser wallet (dry run by default)
  */
-const USAGE = `usage: ballast <verify|cover|book-health> [options]
+const USAGE = `usage: ballast <verify|cover|book-health|dayone> [options]
   ballast verify --bundle <dir> [--from seq] [--to seq] [--account id]
                  [--operator-pubkey hex]... [--daemon-pubkey hex]... [--offline] [--live-cover]
                  [--recordings dir] [--json file|-]
   ballast cover <addr1...|stake1...> [--r-bps 5000] [--short NIGHT] [--json]
   ballast book-health [--root dir] [--from ISO] [--to ISO] [--symbols A,B] [--json file]
+  ballast dayone <d4|d5|d9> --address addr1... [--dry-run] [--yes-i-approve] [--check-revoked]
+                 (live only with --yes-i-approve AND BALLAST_ARM=1; see docs/dayone.md)
 `;
 
 const argv = process.argv.slice(2);
@@ -25,6 +28,11 @@ try {
     case "cover": {
       const { coverMain } = await import("./cover.js");
       process.exitCode = await coverMain(rest);
+      break;
+    }
+    case "dayone": {
+      const { dayoneMain } = await import("./dayone/index.js");
+      process.exitCode = await dayoneMain(rest);
       break;
     }
     case "book-health":

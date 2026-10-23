@@ -23,7 +23,8 @@
     "web:typecheck": "tsc --noEmit -p apps/web/tsconfig.json && tsc --noEmit -p apps/web/tsconfig.node.json",
     "ballast": "tsx apps/cli/src/main.ts",
     "verify": "tsx apps/cli/src/main.ts verify",
-    "cover": "tsx apps/cli/src/main.ts cover"
+    "cover": "tsx apps/cli/src/main.ts cover",
+    "dayone": "tsx apps/cli/src/main.ts dayone"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.6",

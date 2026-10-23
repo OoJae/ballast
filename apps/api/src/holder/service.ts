@@ -9,6 +9,7 @@ import {
   RISK_DISCLOSURE,
   summarizeTx,
   toStrikeSignature,
+  txHashOf,
   verifyCip8,
   WitnessMergeError,
 } from "@ballast/cardano";
@@ -454,6 +455,9 @@ export class HolderService {
       case "withdraw/confirm": {
         const r = await run(() => c.withdrawConfirm(req, proof));
         const prev = previous(req.withdraw_id);
+        // The funding tx the holder signed (Strike submits it); the payout comes from the vault.
+        const fundingTx =
+          typeof req.signed_tx_cbor === "string" ? txHashOf(req.signed_tx_cbor) : null;
         this.deps.db.recordFunding({
           accountId,
           kind: "withdrawal",
@@ -461,7 +465,7 @@ export class HolderService {
           asset: prev?.asset ?? "ADA",
           amountBase: null,
           usdValue: null,
-          txHash: null,
+          txHash: fundingTx,
           status: "submitted",
           nowMs: now,
         });
