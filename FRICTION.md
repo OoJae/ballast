@@ -194,3 +194,9 @@ Dated notes on confusion, docs/API mismatches, and breakage, each with a propose
 
 - **What M4 does:** `buildAnchorTx` builds and signs a CIP-20 self-send offline (tested against preprod-format data with protocol parameters read from Koios for preprod epoch 321 and mainnet epoch 663). Nothing submits it.
 - **Fix:** an operator funds a fresh preprod anchor wallet from the faucet, builds one anchor with these tools, submits it by hand, and records the tx hash in EVIDENCE.md. Mainnet anchoring needs the ≤ 20 ADA hot wallet and an explicit go-ahead.
+
+## 2026-10-23: scoping the recorder deploy with `--filter "@ballast/recorder..."` does not help
+
+- **Proposal (M4 entry above):** install only the recorder's tree on read-only hosts to skip the native and wasm packages.
+- **Why it fails:** `@ballast/evidence` now depends on better-sqlite3 and cardano-serialization-lib, so `@ballast/recorder...` still pulls them in. The filter would also skip the root `tsx` that the systemd unit runs.
+- **Decision:** keep the full `pnpm install --frozen-lockfile`. better-sqlite3 has prebuilt linux-x64 binaries and Sonar-VPS2 has make, gcc and python3 anyway. If read-only hosts need to stay lean later, move db, anchor and bundle into their own package.
