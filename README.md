@@ -6,7 +6,7 @@
 
 NIGHT holders keep their coins in Lace or Eternl as cover. A deterministic, Guard-governed keeper posts covered, post-only asks from each holder's own Strike account into the empty ask side of the NIGHT-USD book. Nothing is pooled: there is no vault, and the coins never leave the holder's wallet.
 
-**Judge mode** is the fastest way in: run the API and the site (see [Run it](#run-it)), then open `/judge`. It is read-only and needs no wallet. Scrub any recorded second of the NIGHT-USD book, see the L3 sequence number it was rebuilt to, and recompute the hourly hash chain of the recordings in your own browser.
+**Live:** https://ballast-public-production.up.railway.app. **Judge mode** at [`/judge`](https://ballast-public-production.up.railway.app/judge) is the fastest way in. It is read-only and needs no wallet. Scrub any recorded second of the NIGHT-USD book, see the L3 sequence number it was rebuilt to, and recompute the hourly hash chain of the recordings in your own browser. The public host runs its own recorder, so its history starts at its first deploy (23 Oct 2026, 08:23 UTC). To run it locally instead, see [Run it](#run-it).
 
 ![The Ballast site: the replayed NIGHT-USD book, the before numbers and the depth chart](docs/screenshots/home-desktop-dark.png)
 
@@ -114,24 +114,26 @@ A vault's NAV is on-venue only. Depositors have to trust the venue's accounting 
 - **The floor rests on a model.** The liquidation-aware floor uses a replica of Strike's mark price (held-out p99 error 0.77 bps on NIGHT). Strike has not confirmed the formula yet, so the floor carries a buffer of 10 bps plus twice that error.
 - **Margin is separate from cover.** A rally raises the short's loss on Strike while the coins at home gain the same, but the home coins are not Strike margin. Margin bands, a combined loss stop and reduce-only buy-backs handle this; a holder can be bought back before a rally ends.
 - **No cancel-on-disconnect on Strike.** If both the keeper and the watchdog fail, asks stay resting. They are covered, so the cost is bounded: selling above the floor while the price is higher still.
-- **Early evidence.** Recording started on 23 Oct 2026. The "before" numbers cover hours, not weeks; the 14-day proof is still ahead.
+- **Early evidence.** Recording started on 23 Oct 2026. The "before" numbers cover hours, not weeks, and no mainnet order has been placed yet. The 14-day proof is still ahead.
 
 ## Status
 
-| Milestone                                | Status                                                                                                                                                                               |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 0 · Repo and research                    | Done                                                                                                                                                                                 |
-| M0 · Day-0 recorder                      | In progress: live since 2026-10-23 00:49 UTC on two hosts, hourly roots verified. Exit needs 24 h continuous, a forced-disconnect rebuild and the "before" Book Health               |
-| M1 · Strike client                       | In progress: signed client, route allowlist, rate limits, user stream, silent-drop detection, reconcile, fake Strike server; green against the fake. Exit needs testnet checks       |
-| M2 · Market model                        | In progress: mark replica (held-out p99 0.77 / 0.65 bps), exact funding replica, tier-aware floor, Book Health, replay. Exit needs a held-out full day                               |
-| M3 · Engine, Guard, simulator            | Not started                                                                                                                                                                          |
-| M4 · Governance and evidence chain       | Not started                                                                                                                                                                          |
-| M5 · Cardano onboarding and cover oracle | In progress: CIP-30/CIP-8 plumbing, FixedTransaction witness merges, HOLDER_PRESENT funding, holder routes, `/join` and `/me`, green against the fake. Exit needs D4, D5, D9 and D10 |
-| M6 · Mainnet micro-tests                 | Not started (builder code `Ballast` registered)                                                                                                                                      |
-| M7 · Holder #0 live                      | Not started                                                                                                                                                                          |
-| M8 · Public surfaces                     | In progress: read-only API and site on replayed recordings; judge mode with in-browser chain verification                                                                            |
-| M9 · 14-day proof                        | Not started                                                                                                                                                                          |
-| M10 · Submission                         | Not started                                                                                                                                                                          |
+| Milestone                                | Status                                                                                                                                                                                                                                   |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0 · Repo and research                    | Done                                                                                                                                                                                                                                     |
+| M0 · Day-0 recorder                      | Live since 2026-10-23 00:49 UTC on three hosts (laptop, a second VPS, the public host), hourly roots verified, 0 L3 sequence gaps. Exit needs 24 h continuous.                                                                           |
+| M1 · Strike client                       | Signed client, route allowlist, rate limits, user stream, silent-drop detection, reconcile, fake Strike. **D1 passed on Strike testnet** (batch, replace-batch, static-rule failure, post-only cross, silent drop of an unknown symbol). |
+| M2 · Market model                        | Mark replica (held-out p99 0.77 / 0.65 bps), exact funding replica, liquidation-aware floor, Book Health, replay. Exit needs a held-out full day.                                                                                        |
+| M3 · Engine, Guard, simulator            | Built. The Critic's replay of 7.8 recorded hours plus a 10-scenario stress library: 0 violations. Exit needs a 7-day replay.                                                                                                             |
+| M4 · Governance and evidence chain       | Built: operator-signed policies, Critic gate, daemon-signed decision chain, `ballast verify`, CIP-20 anchoring. The first policy is live under a Critic PASS. The preprod anchor transaction is pending faucet funds.                    |
+| M5 · Cardano onboarding and cover oracle | Built: CIP-30/CIP-8, Builder Connect, in-app deposit, witness merges, cover oracle. D10 (Koios cover at tip) measured binding and latency; D4, D5 and D9 wait on holder #0's funding.                                                    |
+| M6 · Mainnet micro-tests                 | Builder code `Ballast` registered (D0). The keeper runs in DRY_RUN on mainnet data. D2, D3, D6, D7 and D8 follow D4/D5.                                                                                                                  |
+| M7 · Holder #0 live                      | Keeper and watchdog built and chaos-tested against the fake; waits on M6.                                                                                                                                                                |
+| M8 · Public surfaces                     | **Live** (link above): read-only API and site on recorded data; judge mode with in-browser chain verification.                                                                                                                           |
+| M9 · 14-day proof                        | Not started                                                                                                                                                                                                                              |
+| M10 · Submission                         | In progress                                                                                                                                                                                                                              |
+
+Dated results, with the commands that reproduce them, are in [docs/evidence/EVIDENCE.md](docs/evidence/EVIDENCE.md). Problems found along the way, including where Strike's API behaved differently from its docs, are in [FRICTION.md](FRICTION.md).
 
 ## Run it
 
@@ -153,6 +155,19 @@ pnpm web:dev                       # proxies /api to the API
 
 pnpm web:build                     # static site in apps/web/dist
 pnpm test && pnpm typecheck && pnpm web:typecheck && pnpm lint
+```
+
+Operator tooling (`pnpm ballast <command>`; keys are sealed under a host KEK and only their public halves are printed):
+
+```sh
+pnpm ballast keys new-operator --out ~/.ballast/keys/operator.json   # signs policies
+pnpm ballast keys new-daemon   --out ~/.ballast/keys/daemon.json     # signs decision records
+pnpm ballast policy draft --out draft.json                            # the plan's defaults
+pnpm ballast policy sign --draft draft.json --key ~/.ballast/keys/operator.json --out-dir data/policies
+# The keeper (DRY_RUN by default) sends each new policy to the Critic; only a PASS activates it.
+pnpm ballast anchor --network preprod --anchor-key <file> --daemon-key <file> [--submit]
+pnpm ballast export --out bundle --network preprod --daemon-key ~/.ballast/keys/daemon.json
+pnpm ballast verify --bundle bundle --daemon-pubkey <hex> --recordings data/recordings
 ```
 
 The API indexes only sealed (Merkle-rooted) hours, so it needs at least one completed recorded hour. To deploy, serve `apps/web/dist` as static files with `/api` proxied to the API, or build with `VITE_API_BASE=https://api.example` and list the site's origin in `CORS_ORIGINS`.
@@ -200,18 +215,28 @@ With `HOLDER_ROUTES=1` the API also serves `/api/holder/*` for `/join` and `/me`
 ## Repository
 
 ```
-packages/core           canonical JSON (RFC 8785), hashing
-packages/evidence       segment writer, manifest, Merkle roots, verify
-packages/strike-client  public reads, gap-checked L3 book and feed, signed client, route allowlist
+packages/core           canonical JSON (RFC 8785), hashing, integer units, the QuotePolicy schema
+packages/evidence       segment writer, manifest, Merkle roots, gzip, SQLite evidence store,
+                        CIP-20 anchors, evidence bundles
+packages/strike-client  public reads, gap-checked L3 book and feed, signed client, route allowlist,
+                        rate budget, user stream, silent-drop detection, reconcile
 packages/fake-strike    a fake Strike server for tests (trading, Builder Connect, deposit, withdraw)
-packages/cardano        CIP-30 wallets, CIP-8 verification, holder messages, witness merges
 packages/market         market model: book, Book Health, replay, mark and funding replicas, floor
+packages/engine         ladder, floor and mark constraints, allocator, differ (pure)
+packages/guard          28 fail-closed rules over integer units (pure)
+packages/sim            deterministic L3 replay simulator and the Critic's stress library
+packages/governance     sealed keys, policy signing and renewals, Critic gate, decision chain
+packages/cover          Koios cover oracle, stake-credential binding, Proof of Cover
+packages/cardano        CIP-30 wallets, CIP-8 verification, holder messages, witness merges
+packages/ops            arming, hosting rule, signed heartbeats, kill confirmation, alerts
 apps/recorder           the day-0 recorder
-apps/cli                pnpm book-health, ballast verify | cover | dayone
-apps/api                the read-only public API
+apps/keeper             the keeper daemon (host A)
+apps/watchdog           the cancel-only watchdog (host B)
+apps/cli                ballast verify | cover | book-health | dayone | keys | policy | anchor | export
+apps/api                the read-only public API (it also serves the built site)
 apps/web                the public site (Vite, React, TradingView Lightweight Charts)
-docs/evidence           EVIDENCE.md: dated, verifiable results
-docs/screenshots        the site at 1280 px and 375 px, dark and light
+deploy/                 systemd units, env examples, the public host's Dockerfile
+docs/                   day-one runbook, EVIDENCE.md, screenshots
 ```
 
 ## Data policy

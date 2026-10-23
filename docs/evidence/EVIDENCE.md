@@ -128,3 +128,28 @@ Verdict: **PASS.**
 What changed because of D1:
 - The fake Strike and the replace-batch tests now model the observed cross behaviour: a post-only reject does not stop later creates.
 - The engine never relies on the documented skip. Every create in a batch is sized and floored on its own, so either behaviour is safe.
+
+## M4: first operator-signed policy, Critic PASS, keeper in DRY_RUN on mainnet data (2026-10-23)
+
+- **Keys:** a sealed operator key (public `c5908355…a3b90e`) and a sealed daemon key (public `4eccaf39…d3c7cf`), both under the host KEK. Only public halves are ever printed.
+- **Policy:** `ballast policy draft` (the plan's section 5 defaults), then `ballast policy sign`.
+  - Policy `01M5KYCC77MKFPB3HRD435DT3E`, hash `81edb227…bbb89`.
+  - Valid 2026-10-23 08:35 → 2026-10-24 08:35 UTC.
+- **Critic** (run by the keeper at start; report `54bab71a…facd`, sim at `8834dd0`, seed 1): **PASS, 11 scenarios, 0 violations.**
+
+| Scenario                                | Fills | Armed h | Max combined drawdown |
+| --------------------------------------- | ----- | ------- | --------------------- |
+| recorded, 00:49:49–08:36:33 UTC (7.8 h) | 29    | 2.45    | $35.75                |
+| recorded (same notional)                | 29    | 2.45    | $35.75                |
+| house reaction (fair +60 bps)           | 28    | 0.13    | $36.89                |
+| mark drop, one $417 sell                | 67    | 0.33    | $0.89                 |
+| +30% rally (1 h)                        | 137   | 0.35    | $17.67                |
+| index stall (40 s)                      | 43    | 0.19    | $3.62                 |
+| L3 `clear`                              | 41    | 0.20    | $3.44                 |
+| Koios 3 blocks behind                   | 0     | 0.00    | $0.00                 |
+| holder sells cover mid-quote            | 38    | 0.25    | $4.67                 |
+| 429 storm (2 min, 90%)                  | 53    | 0.25    | $4.43                 |
+| partial replace-batch reject            | 34    | 0.15    | $2.94                 |
+- **Decision 1** in the evidence DB is the daemon-signed `policy` activation, committing to the Critic report's hash.
+- **Keeper:** running in DRY_RUN with no accounts, on mainnet public data (L3 and price sockets open, health `ok`). DRY_RUN never sends: a wiring test proves no signer method is called. The plan's 72 h DRY_RUN clock starts once holder #0's account is bound after D4.
+- **Anchor tooling:** `ballast anchor` is ready. The preprod anchor of this trail waits on faucet funds for the anchor wallet. The keeper holds the daemon lock, so the anchor runs in a short keeper stop (the plan's daily anchor becomes a keeper job).
