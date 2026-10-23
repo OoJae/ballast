@@ -264,6 +264,9 @@ importers:
 
   packages/strike-client:
     dependencies:
+      '@ballast/cardano':
+        specifier: workspace:*
+        version: link:../cardano
       ws:
         specifier: ^8.22.0
         version: 8.22.0

@@ -18,8 +18,10 @@ import { assertClientOrderId } from "./orders.js";
 export type SignerProfile = "AUTONOMOUS" | "CANCEL_ONLY";
 
 /**
- * M5: deposit and withdraw run only while the holder is present and has just signed with their
- * own wallet. Defined here so the type exists; every check under it refuses until M5 lands.
+ * Deposit and withdraw run only while the holder is present and has just signed with their own
+ * wallet. That profile lives in `@ballast/strike-client/funding` (HolderPresentClient), which the
+ * keeper and the watchdog never import; this allowlist refuses every request under it, so no
+ * code path through the main entry can sign a funding route (invariant 18).
  */
 export type HolderPresentProfile = "HOLDER_PRESENT";
 
@@ -106,7 +108,8 @@ const REFUSED: readonly { test: (method: string, path: string) => boolean; reaso
   { test: (m, p) => m === "PUT" && p === "/v2/symbols", reason: "PUT /v2/symbols is refused" },
   {
     test: (_m, p) => /^\/v2\/(deposit|withdraw)(\/|$)/.test(p),
-    reason: "funding routes belong to the HOLDER_PRESENT profile (M5), never the keeper",
+    reason:
+      "funding routes are signed only under HOLDER_PRESENT (@ballast/strike-client/funding), never by the keeper",
   },
 ];
 
@@ -394,7 +397,9 @@ export function checkRoute(
   if (selector) return refuse(`body selector ${selector} is refused`);
 
   if (profile === "HOLDER_PRESENT") {
-    return refuse("HOLDER_PRESENT is defined for M5 and signs nothing yet");
+    return refuse(
+      "HOLDER_PRESENT signs only through @ballast/strike-client/funding, with a fresh holder proof",
+    );
   }
   if (profile !== "AUTONOMOUS" && profile !== "CANCEL_ONLY") {
     return refuse(`unknown profile ${String(profile)}`);

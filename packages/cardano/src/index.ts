@@ -59,5 +59,6 @@ export {
   type TxOutputSummary,
   type TxSummary,
   txHashOf,
+  verifiedSigners,
   WitnessMergeError,
 } from "./witness.js";

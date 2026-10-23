@@ -137,6 +137,24 @@ export function mergeWalletWitnesses(
   }
 }
 
+/** Key hashes of the vkey witnesses whose signature verifies over this transaction's hash. */
+export function verifiedSigners(txHex: string): string[] {
+  const fixed = parseTx(txHex, "the transaction");
+  try {
+    const hash = fixed.transaction_hash().to_bytes();
+    const vkeys = fixed.witness_set().vkeys();
+    const out: string[] = [];
+    for (let i = 0; i < (vkeys?.len() ?? 0); i++) {
+      const vk = vkeys?.get(i);
+      const pk = vk?.vkey().public_key();
+      if (vk && pk?.verify(hash, vk.signature())) out.push(keyHashHex(pk));
+    }
+    return out;
+  } finally {
+    fixed.free();
+  }
+}
+
 export interface TxOutputSummary {
   address: string;
   lovelace: string;

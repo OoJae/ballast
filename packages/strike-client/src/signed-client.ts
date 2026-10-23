@@ -45,7 +45,7 @@ export class StrikeApiError extends Error {
 /** Refused locally before signing: no nonce was used and nothing reached Strike. */
 export class StrikeRefusedError extends Error {
   constructor(
-    readonly kind: "route" | "rate" | "builder-fee" | "clock",
+    readonly kind: "route" | "rate" | "builder-fee" | "clock" | "holder-proof",
     readonly reason: string,
     readonly retryAfterMs?: number,
   ) {
