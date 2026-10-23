@@ -21,3 +21,6 @@ docs/memo-to-strike.md
 # Browser-automation page snapshots (may contain account data)
 .playwright-mcp/
 /buildplan.md
+
+# Agent worktrees and local Claude state
+.claude/
