@@ -262,6 +262,8 @@ export async function signDataForStrike(
 ): Promise<string> {
   const payload = payloadHex.toLowerCase();
   if (!isHex(payload) || payload.length === 0) throw new WalletError("payload must be hex");
+  // VERIFY: CIP-30 takes the address as bech32 or hex; hex is what the reference integration
+  // passes. D4 confirms Lace and Eternl both accept it (FRICTION 2026-10-23).
   return toStrikeSignature(await api.signData(bech32ToAddressHex(address), payload));
 }
 

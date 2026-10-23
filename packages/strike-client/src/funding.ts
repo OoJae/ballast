@@ -30,7 +30,7 @@ import { StrikeApiError, StrikeRefusedError, StrikeTransportError } from "./sign
  * holder's own transaction signature (deposit) or message plus transaction signature
  * (withdrawal); this profile signs the API request around it.
  *
- * Strike's docs disagree on whether an API wallet may call these routes (FRICTION 2026-10-23):
+ * VERIFY: Strike's docs disagree on whether an API wallet may call these routes (FRICTION 2026-10-23):
  * getting-started says no, strike-auth and the builder-codes pages say yes (masterOnly). Either
  * way the holder's wallet signs; D5 and D9 decide whether these requests are accepted or the
  * holder funds in Strike's own app instead.
@@ -140,6 +140,8 @@ export function checkFundingRoute(
         return bad("tx_hash must be a 64-hex Cardano transaction id");
       }
       return { ok: true, route };
+    // VERIFY: estimate is in the strike-withdraw skill but not on the builder-codes withdraw page;
+    // D9 shows whether a builder API wallet may call it (FRICTION 2026-10-23).
     case "POST /v2/withdraw/estimate":
       extra = keysAre(body, ["usd_value", "blockchain", "asset"]);
       if (extra) return bad(extra);

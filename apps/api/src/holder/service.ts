@@ -101,6 +101,9 @@ export const GEOFENCE_SHA256 = sha256(GEOFENCE_STATEMENT);
 export const RISK_SHA256 = sha256(RISK_DISCLOSURE);
 
 /** Strike errors that are about this request, not about API wallets being allowed to fund. */
+// VERIFY: what Strike answers an API wallet on a funding route if getting-started is right is
+// undocumented; any other 401/403 on the first funding step offers the Strike-app path
+// (FRICTION 2026-10-23).
 const ORDINARY_401 = new Set([
   "wallet signature verification failed",
   "signature expired or invalid timestamp",

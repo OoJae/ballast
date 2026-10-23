@@ -118,20 +118,20 @@ A vault's NAV is on-venue only. Depositors have to trust the venue's accounting 
 
 ## Status
 
-| Milestone                                | Status                                                                                                                                                                         |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 0 · Repo and research                    | Done                                                                                                                                                                           |
-| M0 · Day-0 recorder                      | In progress: live since 2026-10-23 00:49 UTC on two hosts, hourly roots verified. Exit needs 24 h continuous, a forced-disconnect rebuild and the "before" Book Health         |
-| M1 · Strike client                       | In progress: signed client, route allowlist, rate limits, user stream, silent-drop detection, reconcile, fake Strike server; green against the fake. Exit needs testnet checks |
-| M2 · Market model                        | In progress: mark replica (held-out p99 0.77 / 0.65 bps), exact funding replica, tier-aware floor, Book Health, replay. Exit needs a held-out full day                         |
-| M3 · Engine, Guard, simulator            | Not started                                                                                                                                                                    |
-| M4 · Governance and evidence chain       | Not started                                                                                                                                                                    |
-| M5 · Cardano onboarding and cover oracle | Not started (cover oracle in progress)                                                                                                                                         |
-| M6 · Mainnet micro-tests                 | Not started (builder code `Ballast` registered)                                                                                                                                |
-| M7 · Holder #0 live                      | Not started                                                                                                                                                                    |
-| M8 · Public surfaces                     | In progress: read-only API and site on replayed recordings; judge mode with in-browser chain verification                                                                      |
-| M9 · 14-day proof                        | Not started                                                                                                                                                                    |
-| M10 · Submission                         | Not started                                                                                                                                                                    |
+| Milestone                                | Status                                                                                                                                                                               |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 0 · Repo and research                    | Done                                                                                                                                                                                 |
+| M0 · Day-0 recorder                      | In progress: live since 2026-10-23 00:49 UTC on two hosts, hourly roots verified. Exit needs 24 h continuous, a forced-disconnect rebuild and the "before" Book Health               |
+| M1 · Strike client                       | In progress: signed client, route allowlist, rate limits, user stream, silent-drop detection, reconcile, fake Strike server; green against the fake. Exit needs testnet checks       |
+| M2 · Market model                        | In progress: mark replica (held-out p99 0.77 / 0.65 bps), exact funding replica, tier-aware floor, Book Health, replay. Exit needs a held-out full day                               |
+| M3 · Engine, Guard, simulator            | Not started                                                                                                                                                                          |
+| M4 · Governance and evidence chain       | Not started                                                                                                                                                                          |
+| M5 · Cardano onboarding and cover oracle | In progress: CIP-30/CIP-8 plumbing, FixedTransaction witness merges, HOLDER_PRESENT funding, holder routes, `/join` and `/me`, green against the fake. Exit needs D4, D5, D9 and D10 |
+| M6 · Mainnet micro-tests                 | Not started (builder code `Ballast` registered)                                                                                                                                      |
+| M7 · Holder #0 live                      | Not started                                                                                                                                                                          |
+| M8 · Public surfaces                     | In progress: read-only API and site on replayed recordings; judge mode with in-browser chain verification                                                                            |
+| M9 · 14-day proof                        | Not started                                                                                                                                                                          |
+| M10 · Submission                         | Not started                                                                                                                                                                          |
 
 ## Run it
 
@@ -182,6 +182,10 @@ Read-only and keyless: `GET`, `HEAD` and `OPTIONS` only, CORS enabled, ETags on 
 | `API_SYMBOLS`                       | `NIGHT-USD,ADA-USD` | Markets served                                                                                    |
 | `ARCHIVE_FRAME_MS`, `ARCHIVE_HOURS` | `5000`, `24`        | Scrubber frame spacing and how many hours keep frames                                             |
 
+### Holder routes (off by default)
+
+With `HOLDER_ROUTES=1` the API also serves `/api/holder/*` for `/join` and `/me`: Sign-In-With-Cardano sessions, Builder Connect with a key the server generates and seals (only its public half goes to Strike), and deposit and withdraw calls through the `HOLDER_PRESENT` profile, each needing a fresh holder proof from the wallet. This turns the process into a signing role: run it only outside Strike's restricted jurisdictions, never on a read-only host. Against Strike mainnet it also needs `BALLAST_ARM=1`. The morning runbook for the wallet checks is [docs/dayone.md](docs/dayone.md).
+
 ## Claims and how to check them
 
 | Claim                                                                                                 | Check                                                                                                                                                    |
@@ -199,10 +203,11 @@ Read-only and keyless: `GET`, `HEAD` and `OPTIONS` only, CORS enabled, ETags on 
 packages/core           canonical JSON (RFC 8785), hashing
 packages/evidence       segment writer, manifest, Merkle roots, verify
 packages/strike-client  public reads, gap-checked L3 book and feed, signed client, route allowlist
-packages/fake-strike    a fake Strike server for tests
+packages/fake-strike    a fake Strike server for tests (trading, Builder Connect, deposit, withdraw)
+packages/cardano        CIP-30 wallets, CIP-8 verification, holder messages, witness merges
 packages/market         market model: book, Book Health, replay, mark and funding replicas, floor
 apps/recorder           the day-0 recorder
-apps/cli                pnpm book-health
+apps/cli                pnpm book-health, ballast verify | cover | dayone
 apps/api                the read-only public API
 apps/web                the public site (Vite, React, TradingView Lightweight Charts)
 docs/evidence           EVIDENCE.md: dated, verifiable results

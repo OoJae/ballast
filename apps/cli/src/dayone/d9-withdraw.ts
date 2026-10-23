@@ -119,6 +119,8 @@ export async function runD9(args: DayoneArgs, deps: D9Deps = {}): Promise<number
       return bal !== null && bal < startBal ? { ...a, bal } : undefined;
     });
     // The funding tx's own change also lands at the wallet; the payout is any other new UTxO.
+    // VERIFY: WITHDRAWAL_SETTLED arrives only on the user stream, which M5 does not open, so the
+    // payout UTxO stands in for it (FRICTION 2026-10-23).
     const payout = await pollUntil(rt, args, "the payout UTxO", async () =>
       (await koios.addressUtxos([args.address])).find(
         (u) =>

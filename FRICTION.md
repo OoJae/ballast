@@ -219,3 +219,33 @@ Dated notes on confusion, docs/API mismatches, and breakage, each with a propose
 - **Unknown:** whether the house posts its bids post-only. That is not public, and Ballast does not parse house order flags.
 - **Sim choice:** a recorded bid that opens at or above a resting Ballast ask takes it for the crossing size (25 of the 27 fills in the recorded replay). This is the conservative reading: more fills, more stress on cover and the floor.
 - **Fix:** revisit if Strike says how the house quotes. The same-size taker re-match is unaffected.
+
+## 2026-10-23: API-wallet funding, M5 design for both answers (open question above)
+
+- **Docs, re-read for M5:** the builder-codes pages (`/api/builder-codes/deposit.md`, `/withdraw.md`) say every deposit and withdraw route "requires API wallet authentication" and that builder-connect wallets call them for the connected account; the strike-deposit and strike-withdraw skills agree (masterOnly, sub-account keys refused). Only getting-started says "Not Allowed: deposit funds, withdraw funds (requires JWT)". Three sources against one, still unproven.
+- **What M5 does:** the HOLDER_PRESENT profile (`@ballast/strike-client/funding`) signs the six funding routes, and only with a fresh holder proof; the holder's wallet signs every transaction and the withdrawal message either way. If Strike answers a first funding step (deposit quote, withdraw estimate or quote) with a 401/403 that is not an ordinary signature or clock error, the API returns `fallback: "strike-app"` and `/join` and `/me` send the holder to Strike's own app. `HOLDER_FUNDING_MODE=strike-app` forces that path. `// VERIFY:` in `apps/api/src/holder/service.ts` and `funding.ts`.
+- **Fix:** D5 and D9 decide (docs/dayone.md). Record the exact answer here and close this entry.
+
+## 2026-10-23: M5 VERIFY items (Cardano onboarding)
+
+- **Hex address to `signData`.** CIP-30 accepts bech32 or hex; Ballast passes hex bytes, as the reference integration does. `// VERIFY:` in `packages/cardano/src/cip30.ts`. D4 confirms with Lace and Eternl.
+- **Eternl's change address.** Ballast binds to `getChangeAddress()` exactly (Strike's `Wallet:` line and `wallet_address` must match). Eternl in multi-address mode may rotate it. `// VERIFY:` in `cip30.ts`; recommend single-address mode until D4 shows otherwise.
+- **Hashed CIP-8 payloads are refused.** Lace and Eternl send `hashed: false`; Strike documents only the plain payload. `// VERIFY:` in `packages/cardano/src/cose-verify.ts`.
+- **A fresh account's `/v2/account`.** The dedicated-account check treats any non-zero balance, margin or PnL, any sub-account and any `symbol_settings` as foreign activity. That a fresh Builder Connect account reads all zeros is assumed. `// VERIFY:` in `packages/strike-client/src/builder-connect.ts`.
+- **Builder Connect's message template.** Before asking for a signature, Ballast checks that Strike's `message_to_sign` names the builder, this wallet, the generated API key and the nonce (strike-auth's template). A template change makes the connect refuse, not sign blind. `// VERIFY:` in `builder-connect.ts`.
+- **`/v2/withdraw/estimate` for builder wallets.** It is in the strike-withdraw skill but not on the builder-codes withdraw page. `// VERIFY:` in `funding.ts`; D9.
+- **USDM decimals.** `/join` converts USDM amounts at 6 decimals. `// VERIFY:` in `apps/web/src/lib/join.ts`; D5 compares the quote's `usd_value`.
+- **WITHDRAWAL_SETTLED.** It arrives only on the user stream, which M5 does not open; the D9 watcher uses the payout UTxO on Koios (excluding the funding tx's own change) instead. `// VERIFY:` in `apps/cli/src/dayone/d9-withdraw.ts`.
+- **The fake's guesses** (`packages/fake-strike/src/onboarding.ts`): the error an API wallet gets on a JWT-only route (`401 missing authorization header`), the credit's user-stream event kind, and the error text for a funding tx that is not the quoted one. Adjust after D5/D9.
+- **Withdrawal funding tx signers.** A multi-address wallet may sign the funding tx with keys other than the connect address's. Ballast requires the quoted body unchanged, at least one witness and every witness valid, and leaves "which keys" to the chain.
+
+## 2026-10-23: a holder proof per funding call costs wallet prompts
+
+- **What M5 does:** each funding request needs its own CIP-8 proof (≤ 60 s, single-use, bound to the account and the exact body). A deposit is 3 `signData` + 1 `signTx`; a withdrawal 4 `signData` + 1 `signTx` (docs/dayone.md has the table).
+- **Why:** the plan's HOLDER_PRESENT rule (§7). Proofs bound to a request cannot be replayed for a different one, and a stolen session token cannot fund anything.
+- **Proposed fix (operator decision):** if the prompts hurt onboarding, let one proof cover a named sequence (quote then build-tx for one amount) with a per-step body hash list, keeping the 60 s life.
+
+## 2026-10-23: the consent hash is stored but not yet chained
+
+- **What M5 does:** the holder role stores `sha256(consent message)` in the private `holder_consents` table and applies r to the account. The signed decision chain belongs to the daemon key on host A, so the API process does not append to it.
+- **Fix (M7):** when the keeper first picks an account up, it appends a `consent` decision whose `inputsDigest` is that hash; `verify` then ties every order to a consent as well as a policy.

@@ -64,6 +64,8 @@ export interface BuilderConnectOptions {
  * What a dedicated account looks like before Ballast ever quotes from it: no balance, margin,
  * PnL, sub-accounts or symbol settings. Anything else is foreign activity (plan §7, /join step 3).
  */
+// VERIFY: that a fresh Builder Connect account reads as all zeros, no sub-accounts and no
+// symbol_settings; D4 records the first 200 (FRICTION 2026-10-23).
 export function foreignActivity(a: StrikeAccountView): string[] {
   const out: string[] = [];
   const nonZero = (v: unknown) => typeof v === "string" && /[1-9]/.test(v);
@@ -116,6 +118,8 @@ export class BuilderConnectClient {
     const r = await this.post<RequestSignatureResponse>("/auth/builder/request-signature", exact);
     const m = typeof r?.message_to_sign === "string" ? r.message_to_sign.split("\n") : [];
     // The holder signs this verbatim; it must name this wallet, this key and this nonce.
+    // VERIFY: these lines follow strike-auth's documented template; a template change makes
+    // Ballast refuse the challenge rather than ask for a blind signature (FRICTION 2026-10-23).
     const has = (line: string) => m.includes(line);
     if (
       typeof r?.nonce !== "string" ||
