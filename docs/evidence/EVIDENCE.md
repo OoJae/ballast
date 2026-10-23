@@ -65,7 +65,7 @@ _(started 2026-10-23; the segment manifest and hourly roots live in `data/record
 ## M4: cover oracle, live and read-only
 
 **2026-10-23, `pnpm ballast cover <addr>`** (Koios, pinned NIGHT `0691b2fe…5af1fa.4e49474854`, r = 0.5).
-- **Holder #0:** stake credential `stake1u8gesvq0fy6r6xcpt569yznrjcfdyux7j7ptd46f9qclz5gp23ddv` (derived locally, cross-checked with cardano-serialization-lib). At block 14,104,006: 0.000000 NIGHT in 0 UTxOs, capacity 0, as expected for a fresh wallet.
+- **Holder #0:** stake credential (derived locally, cross-checked with cardano-serialization-lib). At block 14,104,006: 0.000000 NIGHT in 0 UTxOs, capacity 0, as expected for a fresh wallet.
 - **A real NIGHT holder** (found via Koios `asset_addresses`; address withheld): at block 14,104,012 the stake credential holds 130,733.476954 NIGHT in 11 spendable UTxOs across 2 base addresses on the same stake key.
   - Its first payment address alone sums to 120,189.314965 NIGHT, exactly Koios's own `asset_addresses` figure for it.
   - One script-locked UTxO (3,514.720663 NIGHT) under the same stake key is excluded as cover.
@@ -99,12 +99,12 @@ Verdict: **PASS** (the live mempool test is still skipped; see below).
 - Evidence: `data/dayone/d10-live-20261023T134627Z.json`.
 - Subject: holder #0's stake key, now holding cover.
 
-| Check                   | Result                                                                                                                                                                                                                  |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Cover at the tip        | **1,284.901844 NIGHT** of pinned NIGHT (policy `0691b2fe…`, asset `4e49474854`), matching the wallet.                                                                                                                    |
-| Single binding enforced | **pass.** A second account on the same stake key was refused both in memory and by the evidence DB's UNIQUE(stake_cred).                                                                                                |
+| Check                   | Result                                                                                                                                                                                                                      |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cover at the tip        | **1,284.901844 NIGHT** of pinned NIGHT (policy `0691b2fe…`, asset `4e49474854`), matching the wallet.                                                                                                                       |
+| Single binding enforced | **pass.** A second account on the same stake key was refused both in memory and by the evidence DB's UNIQUE(stake_cred).                                                                                                    |
 | Latency measured        | **pass.** 113 polls; 28 blocks observed (interval p50 20 s, max 46 s); Koios read latency p50 1.7 s, max 12.3 s, inside the 60 s staleness rule. Two reads were refused because the tip moved during 4 consistent re-reads. |
-| Mempool spend → r = 0   | **matcher pass, live test skipped.** The spend matcher, run on the live proof, sets r = 0 for a spend of a counted UTxO. No Ogmios endpoint is set, so a real pending spend was not observed.                          |
+| Mempool spend → r = 0   | **matcher pass, live test skipped.** The spend matcher, run on the live proof, sets r = 0 for a spend of a counted UTxO. No Ogmios endpoint is set, so a real pending spend was not observed.                               |
 
 ## D10: cover oracle, live (2026-10-23, read-only Koios, 10 min)
 
