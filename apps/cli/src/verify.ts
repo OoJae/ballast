@@ -92,6 +92,9 @@ function skip(id: string, title: string, detail: string): VerifyCheck {
  * Invariant 2, re-checked from the record: replay every policy decision through a fresh
  * registry (each activation and renewal must pass every rule at its recorded time), then require
  * every create to name the policy in force when it was decided, with a `bal_` client id.
+ * Convention: a "policy" decision records a successful activation (inputsDigest = the Critic
+ * report hash) or renewal (inputsDigest = the renewal hash); a rejected candidate is recorded as
+ * a "critic" decision naming its FAIL report, so it never appears here.
  */
 function checkActivations(
   c: BundleContents,
