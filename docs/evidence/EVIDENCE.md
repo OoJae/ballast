@@ -61,3 +61,25 @@ _(started 2026-10-23; the segment manifest and hourly roots live in `data/record
 - **Funding replica:** every recorded `fundingRate` (1,353 per market) is reproduced exactly from `averagePremiumIndex` and the served parameters, and every `averagePremiumIndex` (1,232 per market) exactly from its samples. Exactness holds at those two levels. Samples rebuilt from the L3 book fall within the stream index's 8-dp rounding for 1,338/1,350 (NIGHT) and 1,337/1,348 (ADA). Of the rest, 20 of 23 match the book as of the cycle's own time, and 3 ADA samples are unexplained.
 - **Mark replica (held-out half):** published `markPriceUpdate` marks reproduced with p50 0.021 / 0.007 bps and p99 0.77 / 0.65 bps (NIGHT / ADA). The best structure is P2 = 60 impact-mid basis samples ~1.5 s apart, with a 1.1 s book lag. P2's mid is the impact mid (top-of-book mid: 10.3 bps p50 error on NIGHT's P2 ticks).
 - **Floor inputs:** b_liq = 10 bps + 2 × max(held-out, all-tick) p99 = 11.5 / 11.3 bps. A NIGHT long was fragile (tier-consistent trigger within b_liq of the index) on 1.8% of ticks, an ADA long on none. Positions were never stale.
+
+## M3: engine, Guard and simulator
+
+**2026-10-23, Critic replay** (`runCritic`, default NIGHT policy, P2-blind mode, holder #0 plus two outside holders, seed 1). The recorded window is 00:49:49–04:21:36 UTC (3.53 h); the stress library is synthetic.
+| Scenario                      | Violations | Fills | Armed h | Max combined drawdown |
+| ----------------------------- | ---------- | ----- | ------- | --------------------- |
+| recorded (same size)          | 0          | 27    | 2.36    | $16.32                |
+| recorded (same notional)      | 0          | 27    | 2.36    | $16.32                |
+| house reaction (fair +60 bps) | 0          | 28    | 0.13    | $29.44                |
+| mark drop, one $417 sell      | 0          | 67    | 0.33    | $0.89                 |
+| +30% rally (1 h)              | 0          | 137   | 0.35    | $17.67                |
+| index stall (40 s)            | 0          | 43    | 0.19    | $3.62                 |
+| L3 `clear`                    | 0          | 41    | 0.20    | $3.44                 |
+| Koios 3 blocks behind         | 0          | 0     | 0.00    | $0.00                 |
+| holder sells cover mid-quote  | 0          | 38    | 0.25    | $4.67                 |
+| 429 storm (2 min, 90%)        | 0          | 53    | 0.25    | $4.43                 |
+| partial replace-batch reject  | 0          | 34    | 0.15    | $2.94                 |
+- "Violations" sums the simulator's own cover, floor, P2, static and rate checks. They are measured independently of the Guard, which sits in the loop.
+- The verdict is PASS, with output hash `9bd7a6b4…93fa`. The same data root, policy hash and seed reproduce it exactly (a CI test).
+- Recorded fills: 2 re-matched taker buys, and 25 recorded bids that opened at or over a Ballast ask (see FRICTION).
+- Stand-downs over the recorded window: 152 requotes found no non-Ballast ask (NIGHT's ask side was empty), and 121 had a fragile long under P2-blind mode.
+- **Exit criterion not yet met:** M3 asks for a 7-day replay, and only 3.5 h are recorded so far.

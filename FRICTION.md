@@ -156,7 +156,7 @@ Dated notes on confusion, docs/API mismatches, and breakage, each with a propose
 - **Fix (done):** `validateCreate` checks ±4.5% of mark, inside Strike's 5%. A static reject only wastes one requote (a replace-batch then applies nothing); it never loosens safety. Ask Strike for the formula.
 ## 2026-10-23: Ballast stands down whenever NIGHT's ask side is fully empty
 
-- **Measured (M3 replay of the first 3.4 h of recordings):** 142 requotes found no non-Ballast ask at all. The arm rule (L1 ≤ best ask − 5 bps) and the aggregate cap (asks within 2% of mid, Ballast excluded) then both read zero, and the engine stands down. Another 121 stood down for a fragile long under P2-blind mode.
+- **Measured (M3 replay of the first 3.5 h of recordings, 00:49–04:21 UTC):** 152 requotes found no non-Ballast ask at all. The arm rule (L1 ≤ best ask − 5 bps) and the aggregate cap (asks within 2% of mid, Ballast excluded) then both read zero, and the engine stands down. Another 121 stood down for a fragile long under P2-blind mode.
 - This is fail-closed and matches plan section 5, but it is exactly when Ballast's asks would help most.
 - **Proposed fix (operator decision, not changed in M3):** with an empty ask side, arm against index + a fixed offset and size the cap from the last non-empty depth snapshot; or accept the stand-down.
 ## 2026-10-23: replay assumes a recorded bid that crosses a Ballast ask would have traded
