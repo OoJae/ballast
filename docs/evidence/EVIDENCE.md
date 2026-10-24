@@ -93,6 +93,21 @@ _(started 2026-10-23; the segment manifest and hourly roots live in `data/record
 - Stand-downs over the recorded window: 152 requotes found no non-Ballast ask (NIGHT's ask side was empty), and 121 had a fragile long under P2-blind mode.
 - **Exit criterion not yet met:** M3 asks for a 7-day replay, and only 3.5 h are recorded so far.
 
+## D6: mark replica fit on 24 h of recordings (2026-10-24 01:11 UTC, read-only)
+
+Verdict: **fit PASS; the live probe is still to run.**
+- Evidence: `data/dayone/d6-dry-run-20261024T011150Z.json`.
+- Data: the last 24 h of NIGHT-USD recordings, 86,884 one-second ticks.
+- Best hypothesis: impact-price mid, 90 s basis window, 1.1 s book lag.
+
+| Check                     | Result                                                                                                                                 |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Held-out replica error    | **pass.** p50 0.107 bps (the bar is < 0.5), p90 0.497, p99 2.94, max 22.8 bps, over 41,619 held-out ticks.                             |
+| P2's mid definition known | **pass: impact.** On P2 ticks the impact mid errs p50 0.15 bps (p99 3.03); top of book errs p50 10.5 bps.                              |
+| Post-fill mark            | **not run.** At 01:07 UTC the probe wallet was not connected in the Strike app, so no ask was placed. It runs with the holder present. |
+
+The p99 tail (2.94 bps, wider than M2's 0.77 bps on fewer hours) feeds b_liq = 10 bps + 2 × p99 in the floor, as planned.
+
 ## D10 re-run with cover (2026-10-23 13:36–13:46 UTC, read-only Koios, 10 min)
 
 Verdict: **PASS** (the live mempool test is still skipped; see below).
