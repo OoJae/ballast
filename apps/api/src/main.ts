@@ -25,6 +25,7 @@ const index = new RecordingIndex({
   symbols: cfg.symbols,
   archiveFrameMs: cfg.archiveFrameMs,
   archiveHours: cfg.archiveHours,
+  windowHours: cfg.indexHours,
   onError: logError("index build failed"),
 });
 const evidence = new RecordingsEvidence(cfg.recordingsRoot, { onError: logError("verify failed") });

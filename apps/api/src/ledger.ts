@@ -47,6 +47,22 @@ export function sealedRange(roots: readonly RootEntry[]): { fromMs: number; toMs
   return { fromMs: Math.min(...starts), toMs: Math.max(...starts) + HOUR_MS };
 }
 
+/**
+ * The sealed range cut to its last `windowHours`. The index replays this window on every new
+ * rooted hour, so it must stay bounded: replaying everything since day 0 ran out of heap at ~96 h.
+ */
+export function indexRange(
+  roots: readonly RootEntry[],
+  windowHours: number,
+): { fromMs: number; toMs: number } | null {
+  const sealed = sealedRange(roots);
+  if (!sealed) return null;
+  return {
+    fromMs: Math.max(sealed.fromMs, sealed.toMs - windowHours * HOUR_MS),
+    toMs: sealed.toMs,
+  };
+}
+
 /** A cheap fingerprint of the ledger: changes whenever an hour is rooted. */
 export function ledgerKey(l: Ledger): string {
   return `${l.roots.length}:${l.roots.at(-1)?.chain ?? "none"}`;

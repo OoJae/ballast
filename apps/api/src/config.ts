@@ -15,6 +15,8 @@ const EnvSchema = z.object({
   INDEX_REFRESH_MS: intFrom(60_000, 5_000),
   ARCHIVE_FRAME_MS: intFrom(5_000, 1_000),
   ARCHIVE_HOURS: intFrom(24, 1),
+  /** Sealed hours the index replays; bounded so memory and rebuild time stay flat. */
+  INDEX_HOURS: intFrom(24, 1),
   // Used only by the live source.
   STRIKE_API_URL: z.url().default("https://api.strikefinance.org"),
   STRIKE_WS_URL: z
@@ -36,6 +38,7 @@ export interface ApiConfig {
   indexRefreshMs: number;
   archiveFrameMs: number;
   archiveHours: number;
+  indexHours: number;
   strike: { apiUrl: string; wsUrl: string; userAgent: string };
   webDist?: string;
 }
@@ -71,6 +74,7 @@ export function loadApiConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
     indexRefreshMs: e.INDEX_REFRESH_MS,
     archiveFrameMs: e.ARCHIVE_FRAME_MS,
     archiveHours: e.ARCHIVE_HOURS,
+    indexHours: e.INDEX_HOURS,
     strike: { apiUrl: e.STRIKE_API_URL, wsUrl: e.STRIKE_WS_URL, userAgent: e.API_USER_AGENT },
     ...(e.WEB_DIST ? { webDist: e.WEB_DIST } : {}),
   };

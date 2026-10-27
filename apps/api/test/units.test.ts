@@ -1,10 +1,12 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import type { RootEntry } from "@ballast/evidence";
 import { Grid, type GridSpec } from "@ballast/market";
 import { L3Book, type L3Snapshot } from "@ballast/strike-client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { loadApiConfig } from "../src/config.js";
 import { FRAME_BAND, frameFromBook, unitsToNumber } from "../src/frames.js";
+import { HOUR_MS, indexRange } from "../src/ledger.js";
 import { RecordingIndex } from "../src/recording-index.js";
 import { type FeedLike, LiveBookSource, ReplayBookSource } from "../src/sources.js";
 import { FrameList } from "../src/stores.js";
@@ -204,5 +206,33 @@ describe("network boundary", () => {
     const main = readFileSync(`${dir}main.ts`, "utf8");
     // The live source is constructed only behind BOOK_SOURCE=live.
     expect(main).toMatch(/if \(cfg\.source === "live"\) \{\s+const live = createLiveSource/);
+  });
+});
+
+describe("indexRange", () => {
+  const roots = (hours: string[]) => hours.map((hour) => ({ hour }) as RootEntry);
+  const at = (hour: string) => Date.parse(`${hour}:00:00Z`);
+
+  it("keeps only the last windowHours of the sealed range", () => {
+    const hours = Array.from({ length: 96 }, (_, i) =>
+      new Date(at("2026-10-23T00") + i * HOUR_MS).toISOString().slice(0, 13),
+    );
+    expect(indexRange(roots(hours), 24)).toEqual({
+      fromMs: at("2026-10-26T00"),
+      toMs: at("2026-10-27T00"),
+    });
+  });
+
+  it("is the whole sealed range when it is shorter than the window", () => {
+    expect(indexRange(roots(["2026-10-23T00", "2026-10-23T01"]), 24)).toEqual({
+      fromMs: at("2026-10-23T00"),
+      toMs: at("2026-10-23T02"),
+    });
+    expect(indexRange([], 24)).toBeNull();
+  });
+
+  it("defaults INDEX_HOURS to 24", () => {
+    expect(loadApiConfig({}).indexHours).toBe(24);
+    expect(loadApiConfig({ INDEX_HOURS: "48" }).indexHours).toBe(48);
   });
 });

@@ -10,7 +10,7 @@ import {
   type TakerBuy,
 } from "@ballast/market";
 import { decToNumber, frameOf, unitsToNumber } from "./frames.js";
-import { HOUR_MS, type Ledger, ledgerKey, readLedger, sealedRange } from "./ledger.js";
+import { HOUR_MS, indexRange, type Ledger, ledgerKey, readLedger } from "./ledger.js";
 import { FrameList, SeriesStore } from "./stores.js";
 
 const HEALTH_SAMPLE_MS = 1_000;
@@ -27,6 +27,8 @@ export interface RecordingIndexOptions {
   archiveHours?: number;
   /** How many of the latest sealed hours keep 1 s frames for playback (default 1). */
   fineHours?: number;
+  /** How many of the latest sealed hours the index replays at all (default 24). */
+  windowHours?: number;
   now?: () => number;
   onError?: (err: unknown) => void;
 }
@@ -104,7 +106,7 @@ export class RecordingIndex {
   }
 
   private async build(ledger: Ledger): Promise<IndexSnapshot | null> {
-    const range = sealedRange(ledger.roots);
+    const range = indexRange(ledger.roots, this.opts.windowHours ?? 24);
     if (!range) return null;
     const now = this.opts.now ?? Date.now;
     const started = now();
