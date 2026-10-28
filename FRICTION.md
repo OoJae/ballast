@@ -359,3 +359,11 @@ Dated notes on confusion, docs/API mismatches, and breakage, each with a propose
 
 - **What happened:** `d7-kill-latency.ts` waits for CANCELED on the user stream and only then polls L3. If the order has already left L3, its L3 time is stamped with the stream time. That happened in 98 of 100 trials, so the published L3 percentiles are upper bounds.
 - **Fix:** wait on both concurrently (`Promise.all`) and stamp each when it is first seen.
+
+## 2026-10-27: the public site crashed when the recording index ran out of heap
+
+- **What happened:** at 09:15 UTC the Railway process died with `JavaScript heap out of memory`. The site answered 502, and the public recorder in the same container stopped with it.
+  - The API's `RecordingIndex` replayed every sealed hour since 23 Oct on each new rooted hour.
+  - By 27 Oct that was 96 h: 96.6M lines, a 15-minute rebuild, and a peak near Node's ~2 GB default heap while the old and new snapshots coexist.
+- **Fix (done):** `INDEX_HOURS` (default 24) bounds the replay to the last sealed hours, through a pure `indexRange()` with tests. The judge scrubber's archive already covered 24 h. Book Health on the site now reports the last 24 h, not the whole recording.
+- **Still open:** a crash in either process takes the other down (`wait -n` in `deploy/railway/start.sh`). Run the recorder as its own Railway service so a site crash never costs recordings.

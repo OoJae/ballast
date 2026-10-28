@@ -39,7 +39,7 @@ import {
 export type DayOneNetwork = "strike-testnet" | "strike-mainnet" | "cardano-mainnet-read-only";
 
 export interface DayOnePlan {
-  id: "D1" | "D2" | "D3" | "D6" | "D7" | "D8" | "D10";
+  id: "D1" | "D2" | "D3" | "D6" | "D7" | "D8" | "D9a" | "D10";
   title: string;
   network: DayOneNetwork;
   /** What the operator must have ready (accounts, funds, a probe, an Ogmios URL...). */

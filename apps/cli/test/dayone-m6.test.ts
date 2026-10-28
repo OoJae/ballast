@@ -9,6 +9,7 @@ import * as d3 from "../src/dayone/d3-builder-fee-on-maker.js";
 import * as d6 from "../src/dayone/d6-mark-probe.js";
 import * as d7 from "../src/dayone/d7-kill-latency.js";
 import * as d8 from "../src/dayone/d8-socket-and-rate-limits.js";
+import * as d9a from "../src/dayone/d9-buyback.js";
 import * as d10 from "../src/dayone/d10-cover-oracle.js";
 import { type DayOneRig, dayOneRig, forbidNetwork } from "./dayone-m6-helpers.js";
 
@@ -23,7 +24,7 @@ afterEach(async () => {
   rig = undefined;
 });
 
-const SCRIPTS = [d2, d3, d6, d7, d8, d10];
+const SCRIPTS = [d2, d3, d6, d7, d8, d9a, d10];
 const GO = ["--live", "--yes-i-approve", "--eligible-host"];
 
 function nightRig(r: DayOneRig): void {
