@@ -274,3 +274,25 @@ The result is `VERIFY PASS`, with every implemented check passing:
 - The maker side recorded trade **2260736**, `maker: true`, 272 at 0.038618, fee **−0.000525** (the maker rebate) and **`builder_fee: 0.01`** (10 bps of $10.50).
 - The builder account's balance check needs its key, which this run did not have, so that half of the pass condition is unverified. The trade is labelled PROBE and excluded from KPIs.
 - **Position after D3:** holder #0 is short 272 NIGHT on Strike, covered by 1,284.9 NIGHT in its wallet (r × cover = 642 NIGHT). It is closed reduce-only in D9.
+
+## D9 on mainnet: close-out and withdrawals, both accounts flat and empty (2026-10-28)
+
+**D9a, reduce-only buy-back: PASS** (evidence `data/dayone/d9a-live-20261028T041229Z.json`).
+- Holder #0's short was still 272 NIGHT, with no order resting, and still covered: 1,284.9 NIGHT on chain on 26 and 28 Oct.
+- At 04:12 UTC Ballast's own signer sent one `POST /v2/order`: buy 272 NIGHT-USD, IOC, `reduce_only`, limit 0.042805 (mark 0.04238055 + 1%). No bid ever rested.
+- It filled in full at **0.042562** (trade 2350471, taker fee $0.0058). The short is flat.
+- Realised on the D3 short: **−$1.07**. NIGHT rose about 10% between the fill and the exit; the covering NIGHT in the holder's wallet gained the same.
+- The probe closed its matching long in Strike's app at about 0.0418 (+$0.87). Across both accounts, from deposit credit to withdrawal, the D3 round trip cost about $0.22 of spread, fees and funding.
+
+**D9, user-signed withdrawal through Ballast's `/me`: PASS** (evidence `data/dayone/d9-2026-10-28T04-13-44-982Z.json`).
+- Each withdrawal: Strike quotes it from the Builder Connect API wallet, then the wallet signs Strike's message as sent, signs a funding transaction (2 ADA toward the payout, 0.17 ADA network fee), and confirms with one proof. Strike submits the funding transaction itself and pays out from its vault.
+
+| Account   | Withdrawn | Strike fee | Funding tx on chain | Payout received         | End to end |
+| --------- | --------- | ---------- | ------------------- | ----------------------- | ---------- |
+| probe     | $9.53     | $1         | 04:18:27 UTC        | 41.294171 ADA, 04:18:45 | about 20 s |
+| probe     | $12.27    | $1         | 04:26:29 UTC        | 54.707500 ADA, 04:26:50 | about 20 s |
+| holder #0 | $9.53     | $1         | 04:33 UTC           | 41.368539 ADA, 04:35    | 141 s      |
+- Both Strike balances are now dust: $0.0077 (holder #0) and $0.0015 (the probe).
+- Holder #0's NIGHT cover was never spent: its withdrawal funding spent one ADA-only UTxO.
+- **Friction:** the first $9.53 came out of the probe, not holder #0, because Lace's active account was the probe when `/me` signed in. `/me` withdraws for whichever wallet is signed in, as designed, but it does not name that account loudly.
+- **Retry:** Lace once returned "User cancelled authentication" on the funding signature; the same quote then signed on retry.
